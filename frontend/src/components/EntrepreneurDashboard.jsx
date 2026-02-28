@@ -2,16 +2,17 @@ import React, { useState, useEffect, useRef } from "react";
 import {
     Activity, LogOut, Wifi, WifiOff, Upload, FileText, LayoutTemplate,
     ChevronRight, CheckCircle2, Search, Send, Clock, CheckCircle, Briefcase,
-    MapPin, DollarSign, Users
+    MapPin, DollarSign, Users, Linkedin
 } from "lucide-react";
 import { api } from "../api";
 
 export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
-    const [tab, setTab] = useState("apply"); // "apply" | "status"
+    const [tab, setTab] = useState("apply");
     const [investors, setInvestors] = useState([]);
     const [myApps, setMyApps] = useState([]);
     const [files, setFiles] = useState({ pitchDeck: null, financials: null, founderProfile: null });
     const [companyName, setCompanyName] = useState("");
+    const [linkedinUrl, setLinkedinUrl] = useState("");
     const [selectedInvestor, setSelectedInvestor] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [submitting, setSubmitting] = useState(false);
@@ -29,7 +30,8 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
         }
     };
 
-    const allReady = files.pitchDeck && files.financials && files.founderProfile && selectedInvestor && companyName.trim();
+    const isLinkedinValid = /linkedin\.com\/in\//.test(linkedinUrl);
+    const allReady = files.pitchDeck && files.financials && files.founderProfile && selectedInvestor && companyName.trim() && isLinkedinValid;
 
     const handleSubmit = async () => {
         if (!allReady) return;
@@ -39,13 +41,14 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
         try {
             await api.submitApplication(
                 user._id, user.name, selectedInvestor._id,
-                companyName, files.pitchDeck, files.financials, files.founderProfile
+                companyName, linkedinUrl,
+                files.pitchDeck, files.financials, files.founderProfile
             );
             setSuccess(`Application sent to ${selectedInvestor.name}!`);
             setFiles({ pitchDeck: null, financials: null, founderProfile: null });
             setSelectedInvestor(null);
             setCompanyName("");
-            // Refresh applications
+            setLinkedinUrl("");
             const apps = await api.getEntrepreneurApplications(user._id);
             setMyApps(apps);
         } catch (err) {
@@ -62,7 +65,6 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
 
     return (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-            {/* Header */}
             <Header user={user} apiOnline={apiOnline} onLogout={onLogout} />
 
             <main className="container" style={{ flex: 1, padding: "2rem 2rem 4rem" }}>
@@ -92,13 +94,34 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
                             Upload your documents and apply to an investor for evaluation.
                         </p>
 
-                        {/* Company Name */}
+                        {/* Company Name + LinkedIn */}
                         <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                            <label>Company / Startup Name</label>
-                            <input type="text" placeholder="e.g. NexaPay Technologies"
-                                value={companyName}
-                                onChange={(e) => setCompanyName(e.target.value)}
-                            />
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                                <div>
+                                    <label>Company / Startup Name *</label>
+                                    <input type="text" placeholder="e.g. NexaPay Technologies"
+                                        value={companyName}
+                                        onChange={(e) => setCompanyName(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                        <Linkedin size={14} /> Founder LinkedIn URL *
+                                    </label>
+                                    <input type="url" placeholder="https://linkedin.com/in/yourprofile"
+                                        value={linkedinUrl}
+                                        onChange={(e) => setLinkedinUrl(e.target.value)}
+                                        style={{
+                                            borderColor: linkedinUrl && !isLinkedinValid ? "var(--terracotta)" : undefined
+                                        }}
+                                    />
+                                    {linkedinUrl && !isLinkedinValid && (
+                                        <span style={{ fontSize: "0.72rem", color: "var(--terracotta)", marginTop: "0.2rem", display: "block" }}>
+                                            Must be a valid LinkedIn profile URL (linkedin.com/in/…)
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         {/* File Uploads */}
@@ -118,7 +141,6 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
                         <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
                             <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem" }}>Select an Investor</h3>
 
-                            {/* Search */}
                             <div style={{ position: "relative", marginBottom: "1rem" }}>
                                 <Search size={16} style={{
                                     position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
@@ -211,6 +233,11 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
                                                 <div style={{ fontSize: "0.85rem", color: "var(--warm-gray)", marginTop: "0.2rem" }}>
                                                     Sent to: <strong>{app.investor_name}</strong>
                                                 </div>
+                                                {app.linkedin_url && (
+                                                    <div style={{ fontSize: "0.75rem", color: "var(--olive)", marginTop: "0.15rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                                        <Linkedin size={11} /> LinkedIn linked
+                                                    </div>
+                                                )}
                                             </div>
                                             <span className={`badge ${app.status === "analyzed" ? "badge--green" : "badge--yellow"}`}>
                                                 {app.status === "analyzed" ? <><CheckCircle size={12} /> Analyzed</> : <><Clock size={12} /> Pending</>}
