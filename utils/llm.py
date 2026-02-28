@@ -9,7 +9,7 @@ from langchain_groq import ChatGroq
 
 load_dotenv()
 
-_MODEL = "qwen/qwen3-32b"
+_MODEL = "llama-3.3-70b-versatile"
 
 
 def get_llm(temperature: float = 0.0) -> ChatGroq:

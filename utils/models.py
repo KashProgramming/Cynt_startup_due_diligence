@@ -3,6 +3,7 @@ Shared Pydantic models for all inputs and outputs across the system.
 """
 from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import datetime
 from enum import Enum
 
 
@@ -31,6 +32,43 @@ class CheckSizeTier(str, Enum):
     LARGE = "LARGE"
 
 
+# ─── LinkedIn Scraped Data ────────────────────────────────────────────────────
+
+class LinkedInLocation(BaseModel):
+    """Location data from LinkedIn profile."""
+    country: Optional[str] = None
+    country_code: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+
+
+class LinkedInProfile(BaseModel):
+    """Structured data extracted from LinkedIn via scraper."""
+    full_name: str
+    headline: Optional[str] = None
+    public_identifier: Optional[str] = None
+    is_premium: bool = False
+    is_open_to_work: bool = False
+    is_hiring: bool = False
+    is_influencer: bool = False
+    is_top_voice: bool = False
+    is_creator: bool = False
+    created_date: Optional[str] = None          # ISO date string
+    location: Optional[LinkedInLocation] = None
+
+    @property
+    def linkedin_tenure_years(self) -> Optional[float]:
+        """Calculate years since LinkedIn account creation."""
+        if not self.created_date:
+            return None
+        try:
+            created = datetime.fromisoformat(self.created_date.replace("Z", "+00:00"))
+            now = datetime.now(created.tzinfo)
+            return round((now - created).days / 365.25, 1)
+        except (ValueError, TypeError):
+            return None
+
+
 # ─── Extracted Document Data ──────────────────────────────────────────────────
 
 class StartupProfile(BaseModel):
@@ -43,16 +81,16 @@ class StartupProfile(BaseModel):
 
     # Market claims
     tam_usd_millions: float
-    growth_rate_pct: float          # claimed YoY growth %
+    growth_rate_pct: Optional[float] = None          # claimed YoY growth %
     market_problem: str
     competitive_advantages: list[str]
     competitors: list[str]
 
     # Financials
     revenue_usd: float              # current ARR/MRR annualised
-    burn_rate_usd_monthly: float
+    burn_rate_usd_monthly: Optional[float] = None
     raise_amount_usd: float
-    pre_money_valuation_usd: float
+    pre_money_valuation_usd: Optional[float] = None
     existing_cash_usd: Optional[float] = None
 
     # Founder
@@ -62,6 +100,7 @@ class StartupProfile(BaseModel):
     domain_years_experience: int
     notable_investors_or_advisors: list[str]
     linkedin_connections_estimate: Optional[int] = None
+    linkedin_profile: Optional[LinkedInProfile] = None
 
 
 class InvestorPortfolio(BaseModel):

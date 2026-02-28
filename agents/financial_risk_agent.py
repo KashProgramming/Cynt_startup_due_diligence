@@ -52,11 +52,9 @@ def run_financial_risk_agent(
     Returns:
         FinancialRiskOutput: Structured financial risk assessment.
     """
-    arr_multiple = (
-        startup.pre_money_valuation_usd / startup.revenue_usd
-        if startup.revenue_usd > 0
-        else 9999
-    )
+    arr_multiple = 9999
+    if startup.pre_money_valuation_usd is not None and startup.revenue_usd > 0:
+        arr_multiple = startup.pre_money_valuation_usd / startup.revenue_usd
 
     prompt = _PROMPT.format(
         company=startup.company_name,
@@ -68,10 +66,10 @@ def run_financial_risk_agent(
         bankruptcy_months=simulation.bankruptcy_projection_months,
         cap_eff=simulation.capital_efficiency_ratio,
         revenue=startup.revenue_usd,
-        burn=startup.burn_rate_usd_monthly,
+        burn=startup.burn_rate_usd_monthly or 0.0,
         raise_amount=startup.raise_amount_usd,
-        val=startup.pre_money_valuation_usd,
-        growth=startup.growth_rate_pct,
+        val=startup.pre_money_valuation_usd or 0.0,
+        growth=startup.growth_rate_pct or 0.0,
         arr_multiple=arr_multiple,
     )
 

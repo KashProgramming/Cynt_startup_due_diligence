@@ -1,0 +1,8 @@
+﻿Metric,Year 1,Year 2,Year 3
+Cities Contracted,1,4,12
+Revenue ($),"1,50,000","5,20,000","16,50,000"
+Cost of Goods Sold ($),"55,000","1,60,000","4,20,000"
+Gross Profit ($),"95,000","3,60,000","12,30,000"
+Operating Expenses ($),"1,80,000","3,50,000","7,00,000"
+EBITDA ($),"-85,000","10,000","5,30,000"
+Gross Margin (%),63%,69%,74%

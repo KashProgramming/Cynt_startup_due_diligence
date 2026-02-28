@@ -15,7 +15,7 @@ Stage:           {{ r.startup.stage }}
 Geography:       {{ r.startup.geography }}
 Founder:         {{ r.startup.founder_name }}
 Raise Target:    ${{ "{:,.0f}".format(r.startup.raise_amount_usd) }}
-Pre-money Val:   ${{ "{:,.0f}".format(r.startup.pre_money_valuation_usd) }}
+Pre-money Val:   ${{ "{:,.0f}".format(r.startup.pre_money_valuation_usd or 0.0) }}
 --------------------------------------------------------------------------------
 
 FINAL RECOMMENDATION: {{ r.investment_decision.final_decision }}
