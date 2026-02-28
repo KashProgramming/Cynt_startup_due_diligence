@@ -1,0 +1,9 @@
+{
+  "investor_type": "EARLY_VC",
+  "portfolio_sectors": ["fintech", "saas", "healthtech", "saas", "edtech"],
+  "portfolio_stages": ["seed", "Series A"],
+  "portfolio_geographies": ["US", "Europe"],
+  "check_size_range_usd": [250000, 2000000],
+  "total_investments": 12,
+  "target_max_sector_concentration_pct": 30.0
+}

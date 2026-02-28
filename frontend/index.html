@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Startup Due Diligence Engine</title>
+    <meta
+      name="description"
+      content="AI-powered structured investment evaluation for startups. Upload pitch decks, financials, and founder profiles for comprehensive due diligence analysis."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ─── Background Particles ─── -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow--1"></div>
+    <div class="bg-glow bg-glow--2"></div>
+
+    <!-- ─── Header ─── -->
+    <header class="header">
+      <div class="header__brand">
+        <div class="header__logo">
+          <svg viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L2 9l14 7 14-7L16 2z" fill="url(#g1)" />
+            <path d="M2 9v14l14 7V16L2 9z" fill="url(#g2)" opacity=".8" />
+            <path d="M30 9v14l-14 7V16l14-7z" fill="url(#g3)" opacity=".6" />
+            <defs>
+              <linearGradient id="g1" x1="2" y1="2" x2="30" y2="16">
+                <stop stop-color="#06d6a0" />
+                <stop offset="1" stop-color="#6366f1" />
+              </linearGradient>
+              <linearGradient id="g2" x1="2" y1="9" x2="16" y2="30">
+                <stop stop-color="#06d6a0" />
+                <stop offset="1" stop-color="#0891b2" />
+              </linearGradient>
+              <linearGradient id="g3" x1="30" y1="9" x2="16" y2="30">
+                <stop stop-color="#6366f1" />
+                <stop offset="1" stop-color="#8b5cf6" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div>
+          <h1 class="header__title">Due Diligence Engine</h1>
+          <p class="header__sub">AI-Powered Investment Evaluation</p>
+        </div>
+      </div>
+      <div class="header__status" id="healthStatus">
+        <span class="status-dot"></span>
+        <span class="status-text">Connecting…</span>
+      </div>
+    </header>
+
+    <!-- ─── Step Indicators ─── -->
+    <nav class="steps" id="stepNav">
+      <div class="steps__track">
+        <button class="step active" data-step="1">
+          <span class="step__num">1</span>
+          <span class="step__label">Upload Documents</span>
+        </button>
+        <div class="step__line"></div>
+        <button class="step" data-step="2">
+          <span class="step__num">2</span>
+          <span class="step__label">Portfolio Config</span>
+        </button>
+        <div class="step__line"></div>
+        <button class="step" data-step="3">
+          <span class="step__num">3</span>
+          <span class="step__label">Analyzing</span>
+        </button>
+        <div class="step__line"></div>
+        <button class="step" data-step="4">
+          <span class="step__num">4</span>
+          <span class="step__label">Results</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ─── Main Content ─── -->
+    <main class="main">
+      <!-- ═══ Step 1: Upload ═══ -->
+      <section class="panel active" id="panel-1">
+        <div class="panel__header">
+          <h2>Upload Startup Documents</h2>
+          <p>
+            Drag and drop or click to select the required files for due
+            diligence analysis.
+          </p>
+        </div>
+        <div class="upload-grid">
+          <!-- Pitch Deck -->
+          <div
+            class="dropzone"
+            id="drop-pitch"
+            data-field="pitch_deck"
+            data-accept=".pdf"
+          >
+            <div class="dropzone__icon">
+              <svg viewBox="0 0 48 48" fill="none">
+                <rect
+                  x="8"
+                  y="4"
+                  width="32"
+                  height="40"
+                  rx="4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path
+                  d="M16 20h16M16 26h12M16 32h8"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+                <path d="M24 10l4 4h-8l4-4z" fill="currentColor" opacity=".4" />
+              </svg>
+            </div>
+            <h3 class="dropzone__title">Pitch Deck</h3>
+            <p class="dropzone__hint">PDF format</p>
+            <div class="dropzone__file" id="file-pitch"></div>
+            <input type="file" accept=".pdf" id="input-pitch" hidden />
+          </div>
+          <!-- Financials -->
+          <div
+            class="dropzone"
+            id="drop-financials"
+            data-field="financials"
+            data-accept=".csv,.xlsx"
+          >
+            <div class="dropzone__icon">
+              <svg viewBox="0 0 48 48" fill="none">
+                <rect
+                  x="6"
+                  y="8"
+                  width="36"
+                  height="32"
+                  rx="4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path
+                  d="M6 16h36M18 16v24M30 16v24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path
+                  d="M6 24h36M6 32h36"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity=".4"
+                />
+              </svg>
+            </div>
+            <h3 class="dropzone__title">Financials</h3>
+            <p class="dropzone__hint">CSV or XLSX format</p>
+            <div class="dropzone__file" id="file-financials"></div>
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              id="input-financials"
+              hidden
+            />
+          </div>
+          <!-- Founder Profile -->
+          <div
+            class="dropzone"
+            id="drop-founder"
+            data-field="founder_profile"
+            data-accept=".pdf"
+          >
+            <div class="dropzone__icon">
+              <svg viewBox="0 0 48 48" fill="none">
+                <circle
+                  cx="24"
+                  cy="16"
+                  r="8"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path
+                  d="M12 40c0-6.627 5.373-12 12-12s12 5.373 12 12"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </div>
+            <h3 class="dropzone__title">Founder Profile</h3>
+            <p class="dropzone__hint">PDF format</p>
+            <div class="dropzone__file" id="file-founder"></div>
+            <input type="file" accept=".pdf" id="input-founder" hidden />
+          </div>
+        </div>
+        <div class="panel__actions">
+          <button class="btn btn--secondary" id="btnPreview" disabled>
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+              <path
+                d="M10 3C5 3 1.73 7.11 1 10c.73 2.89 4 7 9 7s8.27-4.11 9-7c-.73-2.89-4-7-9-7zm0 12a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"
+              />
+            </svg>
+            Preview Profile
+          </button>
+          <button class="btn btn--primary" id="btnToStep2" disabled>
+            Continue
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+              <path
+                fill-rule="evenodd"
+                d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+              />
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- ═══ Step 2: Portfolio Config ═══ -->
+      <section class="panel" id="panel-2">
+        <div class="panel__header">
+          <h2>Investor Portfolio Configuration</h2>
+          <p>
+            Configure your portfolio context for tailored analysis. Defaults
+            loaded from sample portfolio.
+          </p>
+        </div>
+        <form class="portfolio-form" id="portfolioForm" autocomplete="off">
+          <div class="form-grid">
+            <!-- Investor Type -->
+            <div class="form-group">
+              <label for="investorType">Investor Type</label>
+              <select id="investorType" required>
+                <option value="ANGEL">Angel Investor</option>
+                <option value="EARLY_VC" selected>Early-Stage VC</option>
+                <option value="ACCELERATOR">Accelerator</option>
+                <option value="COMMITTEE">Investment Committee</option>
+              </select>
+            </div>
+            <!-- Total Investments -->
+            <div class="form-group">
+              <label for="totalInvestments">Total Portfolio Investments</label>
+              <input
+                type="number"
+                id="totalInvestments"
+                value="12"
+                min="0"
+                max="500"
+                required
+              />
+            </div>
+            <!-- Sectors -->
+            <div class="form-group form-group--wide">
+              <label for="sectors"
+                >Portfolio Sectors
+                <span class="hint">(comma-separated)</span></label
+              >
+              <input
+                type="text"
+                id="sectors"
+                value="fintech, saas, healthtech, edtech"
+                placeholder="e.g. fintech, saas, healthtech"
+                required
+              />
+            </div>
+            <!-- Stages -->
+            <div class="form-group">
+              <label for="stages"
+                >Portfolio Stages
+                <span class="hint">(comma-separated)</span></label
+              >
+              <input
+                type="text"
+                id="stages"
+                value="seed, Series A"
+                placeholder="e.g. seed, Series A"
+                required
+              />
+            </div>
+            <!-- Geographies -->
+            <div class="form-group">
+              <label for="geographies"
+                >Target Geographies
+                <span class="hint">(comma-separated)</span></label
+              >
+              <input
+                type="text"
+                id="geographies"
+                value="US, Europe"
+                placeholder="e.g. US, Europe, India"
+                required
+              />
+            </div>
+            <!-- Check Size Min -->
+            <div class="form-group">
+              <label for="checkMin">Min Check Size (USD)</label>
+              <input
+                type="number"
+                id="checkMin"
+                value="250000"
+                min="0"
+                step="10000"
+                required
+              />
+            </div>
+            <!-- Check Size Max -->
+            <div class="form-group">
+              <label for="checkMax">Max Check Size (USD)</label>
+              <input
+                type="number"
+                id="checkMax"
+                value="2000000"
+                min="0"
+                step="10000"
+                required
+              />
+            </div>
+            <!-- Max Sector Concentration -->
+            <div class="form-group form-group--wide">
+              <label for="maxConcentration">
+                Max Sector Concentration: <strong id="concValue">30</strong>%
+              </label>
+              <input
+                type="range"
+                id="maxConcentration"
+                value="30"
+                min="5"
+                max="100"
+                step="5"
+              />
+              <div class="range-labels">
+                <span>5%</span><span>50%</span><span>100%</span>
+              </div>
+            </div>
+          </div>
+        </form>
+        <div class="panel__actions">
+          <button class="btn btn--ghost" id="btnBackTo1">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+              <path
+                fill-rule="evenodd"
+                d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+              />
+            </svg>
+            Back
+          </button>
+          <button class="btn btn--primary" id="btnAnalyze">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+              <path
+                d="M9 2a7 7 0 105.468 11.37l3.08 3.08a1 1 0 001.415-1.414l-3.08-3.08A7 7 0 009 2zm0 2a5 5 0 110 10A5 5 0 019 4z"
+              />
+            </svg>
+            Run Due Diligence
+          </button>
+        </div>
+      </section>
+
+      <!-- ═══ Step 3: Analyzing ═══ -->
+      <section class="panel" id="panel-3">
+        <div class="analyzing">
+          <div class="analyzing__spinner">
+            <div class="orbit"><div class="orbit__dot"></div></div>
+            <div class="orbit orbit--2"><div class="orbit__dot"></div></div>
+            <div class="orbit orbit--3"><div class="orbit__dot"></div></div>
+            <div class="analyzing__core"></div>
+          </div>
+          <h2 class="analyzing__title">Running Due Diligence Pipeline</h2>
+          <p class="analyzing__sub" id="analyzeStatus">
+            Extracting startup profile from documents…
+          </p>
+          <div class="pipeline-stages" id="pipelineStages">
+            <div class="pstage active" id="ps-extract">
+              <div class="pstage__dot"></div>
+              <span>Document Extraction</span>
+            </div>
+            <div class="pstage" id="ps-financial">
+              <div class="pstage__dot"></div>
+              <span>Financial Simulation</span>
+            </div>
+            <div class="pstage" id="ps-market">
+              <div class="pstage__dot"></div>
+              <span>Market Signals</span>
+            </div>
+            <div class="pstage" id="ps-agents">
+              <div class="pstage__dot"></div>
+              <span>Agent Analysis</span>
+            </div>
+            <div class="pstage" id="ps-decision">
+              <div class="pstage__dot"></div>
+              <span>Investment Decision</span>
+            </div>
+            <div class="pstage" id="ps-memo">
+              <div class="pstage__dot"></div>
+              <span>Memo Generation</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ Step 4: Results ═══ -->
+      <section class="panel" id="panel-4">
+        <!-- Decision Hero -->
+        <div class="hero" id="heroSection">
+          <div class="hero__decision">
+            <span class="decision-badge" id="decisionBadge">—</span>
+            <p class="hero__check" id="heroCheck">Check Size Tier: —</p>
+          </div>
+          <div class="hero__score">
+            <div class="gauge" id="mainGauge">
+              <svg viewBox="0 0 120 120">
+                <circle class="gauge__bg" cx="60" cy="60" r="52" />
+                <circle
+                  class="gauge__fill"
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  id="gaugeCircle"
+                />
+              </svg>
+              <div class="gauge__value" id="gaugeValue">0</div>
+              <div class="gauge__label">Decision Score</div>
+            </div>
+          </div>
+          <div class="hero__info" id="heroInfo">
+            <div class="hero__row">
+              <span>Company</span><strong id="heroCompany">—</strong>
+            </div>
+            <div class="hero__row">
+              <span>Sector</span><strong id="heroSector">—</strong>
+            </div>
+            <div class="hero__row">
+              <span>Stage</span><strong id="heroStage">—</strong>
+            </div>
+            <div class="hero__row">
+              <span>Raise</span><strong id="heroRaise">—</strong>
+            </div>
+            <div class="hero__row">
+              <span>Valuation</span><strong id="heroVal">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Score Cards -->
+        <div class="score-grid" id="scoreGrid">
+          <div class="score-card" id="card-financial">
+            <div class="score-card__header">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"
+                />
+              </svg>
+              <h3>Financial Risk</h3>
+            </div>
+            <div class="score-card__gauge">
+              <div class="mini-gauge" id="mg-financial"><span>0</span></div>
+            </div>
+            <div class="score-card__details" id="det-financial"></div>
+          </div>
+          <div class="score-card" id="card-market">
+            <div class="score-card__header">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M3 3v18h18" />
+                <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" />
+              </svg>
+              <h3>Market Validation</h3>
+            </div>
+            <div class="score-card__gauge">
+              <div class="mini-gauge" id="mg-market"><span>0</span></div>
+            </div>
+            <div class="score-card__details" id="det-market"></div>
+          </div>
+          <div class="score-card" id="card-founder">
+            <div class="score-card__header">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="7" r="4" />
+                <path d="M5.5 21c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5" />
+              </svg>
+              <h3>Founder Intelligence</h3>
+            </div>
+            <div class="score-card__gauge">
+              <div class="mini-gauge" id="mg-founder"><span>0</span></div>
+            </div>
+            <div class="score-card__details" id="det-founder"></div>
+          </div>
+          <div class="score-card" id="card-portfolio">
+            <div class="score-card__header">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="2" y="7" width="20" height="14" rx="2" />
+                <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
+              </svg>
+              <h3>Portfolio Fit</h3>
+            </div>
+            <div class="score-card__gauge">
+              <div class="mini-gauge" id="mg-portfolio"><span>0</span></div>
+            </div>
+            <div class="score-card__details" id="det-portfolio"></div>
+          </div>
+        </div>
+
+        <!-- Financial Simulation -->
+        <div class="result-section glass-card" id="simSection">
+          <h3 class="result-section__title">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"
+              />
+              <line x1="4" y1="22" x2="4" y2="15" />
+            </svg>
+            Financial Simulation
+          </h3>
+          <div class="sim-metrics" id="simMetrics"></div>
+        </div>
+
+        <!-- Market Signals -->
+        <div class="result-section glass-card" id="signalsSection">
+          <h3 class="result-section__title">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            External Market Signals
+          </h3>
+          <div class="signal-bars" id="signalBars"></div>
+        </div>
+
+        <!-- Risks & Milestones -->
+        <div class="two-col">
+          <div class="result-section glass-card">
+            <h3 class="result-section__title">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              Key Risks
+            </h3>
+            <ul class="risk-list" id="riskList"></ul>
+          </div>
+          <div class="result-section glass-card">
+            <h3 class="result-section__title">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              Required Milestones
+            </h3>
+            <ul class="milestone-list" id="milestoneList"></ul>
+          </div>
+        </div>
+
+        <!-- Full Memo -->
+        <div class="result-section glass-card">
+          <div class="memo-header">
+            <h3 class="result-section__title">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+                />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              Investment Memo
+            </h3>
+            <button class="btn btn--ghost btn--small" id="btnCopyMemo">
+              Copy Memo
+            </button>
+          </div>
+          <pre class="memo-block" id="memoBlock"></pre>
+        </div>
+
+        <!-- New Analysis -->
+        <div class="panel__actions panel__actions--center">
+          <button class="btn btn--primary" id="btnNewAnalysis">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+              <path
+                fill-rule="evenodd"
+                d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+              />
+            </svg>
+            Start New Analysis
+          </button>
+        </div>
+      </section>
+
+      <!-- ═══ Profile Preview Modal ═══ -->
+      <div class="modal-overlay" id="previewModal">
+        <div class="modal glass-card">
+          <div class="modal__header">
+            <h3>Extracted Startup Profile</h3>
+            <button class="modal__close" id="btnCloseModal">&times;</button>
+          </div>
+          <div class="modal__body" id="previewBody">
+            <div class="analyzing__spinner analyzing__spinner--small">
+              <div class="orbit"><div class="orbit__dot"></div></div>
+              <div class="analyzing__core"></div>
+            </div>
+            <p style="text-align: center; color: var(--text-muted)">
+              Extracting profile…
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ─── Toast ─── -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
