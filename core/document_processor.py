@@ -261,6 +261,13 @@ def extract_startup_profile(
     ])
     data = extract_json(response.content)
 
+    # ── Clean up nulls for required non-optional fields ─
+    data["founder_name"] = data.get("founder_name") or "Unknown"
+    data["founder_background"] = data.get("founder_background") or ""
+    data["prior_exits"] = data.get("prior_exits") or 0
+    data["domain_years_experience"] = data.get("domain_years_experience") or 0
+    data["notable_investors_or_advisors"] = data.get("notable_investors_or_advisors") or []
+
     # ── Step 3: Override LLM financial fields with deterministic CSV values ─
     # Only override if the CSV actually provided a value (non-None)
     for field, value in csv_financials.items():

@@ -94,11 +94,11 @@ class StartupProfile(BaseModel):
     existing_cash_usd: Optional[float] = None
 
     # Founder
-    founder_name: str
-    founder_background: str         # raw text from profile
-    prior_exits: int
-    domain_years_experience: int
-    notable_investors_or_advisors: list[str]
+    founder_name: str = "Unknown"
+    founder_background: str = ""         # raw text from profile
+    prior_exits: int = 0
+    domain_years_experience: int = 0
+    notable_investors_or_advisors: list[str] = Field(default_factory=list)
     linkedin_connections_estimate: Optional[int] = None
     linkedin_profile: Optional[LinkedInProfile] = None
 

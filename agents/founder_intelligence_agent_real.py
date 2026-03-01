@@ -3,8 +3,10 @@ Founder Intelligence Agent — rubric-based scoring of domain fit, network stren
 and execution credibility.  Uses real LinkedIn scraped data when available.
 """
 from langchain_core.messages import HumanMessage, SystemMessage
+
 from utils.llm import get_llm, extract_json
 from utils.models import StartupProfile, FounderIntelligenceOutput
+
 _SYSTEM = """You are a startup founder evaluation specialist.
 Score 0–100 per dimension using the rubric. 100 = best possible.
 Respond ONLY with valid JSON, no explanation outside the JSON."""
@@ -158,22 +160,4 @@ def run_founder_intelligence_agent(startup: StartupProfile) -> FounderIntelligen
         HumanMessage(content=prompt),
     ])
     data = extract_json(response.content)
-    
-    # ── Enforce minimum scores to avoid aggressively harsh 0/100 defaults ─
-    data["domain_fit_score"] = max(data.get("domain_fit_score", 20), 20)
-    
     return FounderIntelligenceOutput(**data)
-
-if __name__ == "__main__":
-    test_input = {
-        "founder_name": "Test Founder",
-        "linkedin_headline": "AI Engineer | 8 years in ML | ex-Google",
-        "years_experience": 8,
-        "sector": "artificial intelligence",
-        "prior_exits": 0,
-        "education": "Computer Science",
-        "company_description": "AI-driven healthcare diagnostics platform"
-    }
-
-    result = run_founder_intelligence_agent(test_input)
-    print(result)
