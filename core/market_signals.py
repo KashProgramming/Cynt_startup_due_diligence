@@ -4,13 +4,20 @@ Includes rate-limit handling and cached fallback mode.
 All outputs are normalized numeric scores (0–100).
 """
 import os
+import math
 import time
 import logging
 from functools import lru_cache
-
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+
+if not NEWS_API_KEY:
+    raise ValueError("NEWS_API_KEY not loaded")
+
 logger = logging.getLogger(__name__)
 
 _FALLBACK_SCORE = 50.0  # neutral fallback when APIs are unavailable
@@ -63,7 +70,7 @@ def _get_news_score_cached(keyword: str) -> float:
         result = client.get_everything(q=keyword, language="en", page_size=1)
         total = result.get("totalResults", 0)
         # Normalize: cap at 10,000 articles → 100
-        return min(float(total) / 100.0, 100.0)
+        return min(math.log(total + 1) * 10, 100)
     except Exception as e:
         logger.warning(f"News API fallback for '{keyword}': {e}")
         return _FALLBACK_SCORE
