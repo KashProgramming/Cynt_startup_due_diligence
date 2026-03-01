@@ -1,4 +1,8 @@
-Year,Revenue ($),Operating Cost ($),Net Profit ($),Customer Acquisition Cost ($)
-2026,150000,100000,50000,120
-2027,450000,220000,230000,95
-2028,1200000,500000,700000,80
+Metric,Current,Projected
+Annual Revenue,150000,1200000
+Monthly Burn Rate,30000,65000
+Existing Cash on Hand,80000,
+Target Raise Amount,500000,
+Pre-Money Valuation,4000000,
+Annual Growth Rate,150,280
+TAM,1200,2500

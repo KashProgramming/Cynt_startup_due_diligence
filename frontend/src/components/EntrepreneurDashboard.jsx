@@ -225,26 +225,52 @@ export default function EntrepreneurDashboard({ user, apiOnline, onLogout }) {
                             </div>
                         ) : (
                             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                                {myApps.map(app => (
-                                    <div key={app._id} className="card" style={{ padding: "1.25rem 1.5rem" }}>
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                            <div>
-                                                <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>{app.company_name}</div>
-                                                <div style={{ fontSize: "0.85rem", color: "var(--warm-gray)", marginTop: "0.2rem" }}>
-                                                    Sent to: <strong>{app.investor_name}</strong>
-                                                </div>
-                                                {app.linkedin_url && (
-                                                    <div style={{ fontSize: "0.75rem", color: "var(--olive)", marginTop: "0.15rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                                                        <Linkedin size={11} /> LinkedIn linked
+                                {myApps.map(app => {
+                                    const badgeClass = app.status === "approved" ? "badge--green"
+                                        : app.status === "rejected" ? ""
+                                            : app.status === "analyzed" ? "badge--green"
+                                                : "badge--yellow";
+                                    const badgeLabel = app.status === "approved" ? "✅ Approved"
+                                        : app.status === "rejected" ? "❌ Declined"
+                                            : app.status === "analyzed" ? "Analyzed"
+                                                : "Pending";
+
+                                    return (
+                                        <div key={app._id} className="card" style={{ padding: "1.25rem 1.5rem" }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>{app.company_name}</div>
+                                                    <div style={{ fontSize: "0.85rem", color: "var(--warm-gray)", marginTop: "0.2rem" }}>
+                                                        Sent to: <strong>{app.investor_name}</strong>
                                                     </div>
-                                                )}
+                                                    {app.linkedin_url && (
+                                                        <div style={{ fontSize: "0.75rem", color: "var(--olive)", marginTop: "0.15rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                                            <Linkedin size={11} /> LinkedIn linked
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className={`badge ${badgeClass}`}
+                                                    style={app.status === "rejected" ? { background: "var(--danger-bg)", color: "var(--terracotta-dark)" } : {}}>
+                                                    {app.status === "analyzed" ? <><CheckCircle size={12} /> {badgeLabel}</> : <><Clock size={12} /> {badgeLabel}</>}
+                                                </span>
                                             </div>
-                                            <span className={`badge ${app.status === "analyzed" ? "badge--green" : "badge--yellow"}`}>
-                                                {app.status === "analyzed" ? <><CheckCircle size={12} /> Analyzed</> : <><Clock size={12} /> Pending</>}
-                                            </span>
+
+                                            {/* Decision message from investor */}
+                                            {app.decision_message && (
+                                                <div style={{
+                                                    marginTop: "0.75rem", padding: "0.85rem 1rem",
+                                                    borderRadius: "var(--radius-sm)",
+                                                    background: app.status === "approved" ? "var(--success-bg)" : "var(--danger-bg)",
+                                                    fontSize: "0.9rem",
+                                                    color: app.status === "approved" ? "var(--olive-dark)" : "var(--terracotta-dark)",
+                                                    lineHeight: 1.5
+                                                }}>
+                                                    {app.decision_message}
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

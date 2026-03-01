@@ -286,6 +286,34 @@ async def analyze_application(app_id: str):
     return result_dict
 
 
+@app.post("/applications/{app_id}/decision")
+async def set_application_decision(app_id: str, payload: str = Form(...)):
+    """Investor approves or rejects an analyzed application."""
+    data = json.loads(payload)
+    decision = data.get("decision")  # "approved" | "rejected"
+    message = data.get("message", "")
+
+    if decision not in ("approved", "rejected"):
+        raise HTTPException(status_code=422, detail="decision must be 'approved' or 'rejected'")
+
+    apps = get_applications_collection()
+    app_doc = apps.find_one({"_id": _oid(app_id)})
+    if not app_doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    apps.update_one(
+        {"_id": _oid(app_id)},
+        {"$set": {
+            "status": decision,
+            "decision_message": message,
+            "decision_at": _now(),
+        }},
+    )
+
+    updated = apps.find_one({"_id": _oid(app_id)})
+    return _serialize_app(updated)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # COLLABORATIONS
 # ═══════════════════════════════════════════════════════════════════════════════

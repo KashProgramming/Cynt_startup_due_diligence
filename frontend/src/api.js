@@ -69,6 +69,13 @@ export const api = {
         return _json(res);
     },
 
+    setDecision: async (appId, decision, message) => {
+        const fd = new FormData();
+        fd.append("payload", JSON.stringify({ decision, message }));
+        const res = await fetch(`${API_BASE_URL}/applications/${appId}/decision`, { method: "POST", body: fd });
+        return _json(res);
+    },
+
     // ─── Collaborations ──────────────────────────────────────────────────
     createCollaboration: async (applicationId, leadInvestorId, leadInvestorName) => {
         const fd = new FormData();

@@ -29,7 +29,7 @@ export default function Step4_Results({ result, onReset }) {
 
     const fmtNum = (n) => n === null || n === undefined ? "—" : Number(n).toLocaleString('en-US');
     const fmtFallback = (val, suffix = "") => {
-        if (val === null || val === undefined) return "Infinite";
+        if (val === null || val === undefined) return "N/A";
         if (typeof val === 'string' && val.includes("N/A")) return "N/A";
         return `${val}${suffix}`;
     };
