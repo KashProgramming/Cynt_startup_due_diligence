@@ -1,8 +1,5 @@
-const API_BASE_URL = window.location.origin === "http://localhost:5173"
-    ? "http://localhost:8000"
-    : window.location.origin.includes("localhost:51")
-        ? "http://localhost:8000"
-        : window.location.origin;
+const _isLocalDev = window.location.port >= "5170" && window.location.port <= "5180";
+const API_BASE_URL = _isLocalDev ? "http://localhost:8000" : window.location.origin;
 
 async function _json(res) {
     if (!res.ok) {
@@ -111,6 +108,50 @@ export const api = {
 
     getMyCollaborations: async (investorId) => {
         const res = await fetch(`${API_BASE_URL}/collaborations/investor/${investorId}`);
+        return _json(res);
+    },
+
+    // ─── Collaboration Invites (new workflow) ────────────────────────────
+    inviteCollaboratorNew: async (applicationId, invitingInvestorId, collaboratorInvestorId) => {
+        const fd = new FormData();
+        fd.append("payload", JSON.stringify({
+            application_id: applicationId,
+            inviting_investor_id: invitingInvestorId,
+            collaborator_investor_id: collaboratorInvestorId,
+        }));
+        const res = await fetch(`${API_BASE_URL}/collaborations/invite`, { method: "POST", body: fd });
+        return _json(res);
+    },
+
+    decideCollaborationInvite: async (inviteId, decision) => {
+        const fd = new FormData();
+        fd.append("payload", JSON.stringify({ decision }));
+        const res = await fetch(`${API_BASE_URL}/collaborations/invites/${inviteId}/decide`, { method: "POST", body: fd });
+        return _json(res);
+    },
+
+    assessCollabInvite: async (inviteId) => {
+        const res = await fetch(`${API_BASE_URL}/collaborations/invites/${inviteId}/assess`, { method: "POST" });
+        return _json(res);
+    },
+
+    getInvitesForInvestor: async (investorId) => {
+        const res = await fetch(`${API_BASE_URL}/collaborations/invites/investor/${investorId}`);
+        return _json(res);
+    },
+
+    getSentInvites: async (investorId) => {
+        const res = await fetch(`${API_BASE_URL}/collaborations/invites/sent/${investorId}`);
+        return _json(res);
+    },
+
+    getDealSummary: async (appId) => {
+        const res = await fetch(`${API_BASE_URL}/applications/${appId}/deal-summary`);
+        return _json(res);
+    },
+
+    getCollaborationHub: async (investorId) => {
+        const res = await fetch(`${API_BASE_URL}/collaborations/hub/${investorId}`);
         return _json(res);
     },
 

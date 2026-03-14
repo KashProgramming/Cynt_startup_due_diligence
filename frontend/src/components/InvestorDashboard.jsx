@@ -2,45 +2,54 @@ import React, { useState, useEffect } from "react";
 import {
     Eye, PlayCircle, Clock, CheckCircle, FileText, Users,
     RefreshCw, UserPlus, Handshake, X, Search, Linkedin,
-    ArrowLeft, ThumbsUp, ThumbsDown, XCircle, Award
+    ArrowLeft, ThumbsUp, ThumbsDown, Award,
+    Inbox, Mail
 } from "lucide-react";
-import { Header } from "./EntrepreneurDashboard";
+import { Sidebar } from "./EntrepreneurDashboard";
 import Step4_Results from "./Step4_Results";
 import { api } from "../api";
 
 export default function InvestorDashboard({ user, apiOnline, onLogout }) {
-    const [tab, setTab] = useState("applications"); // "applications" | "collabs"
+    const [tab, setTab] = useState("applications");
+    // Single unified list from backend (direct apps + collab-invite apps merged)
     const [applications, setApplications] = useState([]);
-    const [collaborations, setCollaborations] = useState([]);
+    const [collabInvites, setCollabInvites] = useState([]);   // all invites received
+    const [sentInvites, setSentInvites] = useState([]);        // invites I sent
+    const [hubInvites, setHubInvites] = useState([]);          // decided invites (hub)
+    const [allInvestors, setAllInvestors] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [analyzing, setAnalyzing] = useState(null);
+    const [analyzing, setAnalyzing] = useState(null); // appId or inviteId being analyzed
     const [viewingResult, setViewingResult] = useState(null);
-    const [viewingAppId, setViewingAppId] = useState(null); // track which app's result we're viewing
+    const [viewingAppId, setViewingAppId] = useState(null);
     const [error, setError] = useState("");
 
-    // Decision modal
-    const [decisionModal, setDecisionModal] = useState(null); // { appId, companyName }
-    const [decisionType, setDecisionType] = useState(null); // "approved" | "rejected"
+    // Decision modal (for direct app final decision)
+    const [decisionModal, setDecisionModal] = useState(null);
+    const [decisionType, setDecisionType] = useState(null);
     const [decisionMsg, setDecisionMsg] = useState("");
     const [decidingLoading, setDecidingLoading] = useState(false);
 
-    // Collaboration modal
-    const [collabModal, setCollabModal] = useState(null);
-    const [allInvestors, setAllInvestors] = useState([]);
+    // Invite modal — for inviting collaborators on accepted apps
+    const [inviteModal, setInviteModal] = useState(null);
     const [inviteSearch, setInviteSearch] = useState("");
     const [inviting, setInviting] = useState(false);
 
     const fetchAll = async () => {
         setLoading(true);
+        setError("");
         try {
-            const [apps, collabs, investors] = await Promise.all([
+            const [apps, investors, invites, sent, hub] = await Promise.all([
                 api.getInvestorApplications(user._id),
-                api.getMyCollaborations(user._id),
                 api.getInvestors(),
+                api.getInvitesForInvestor(user._id),
+                api.getSentInvites(user._id),
+                api.getCollaborationHub(user._id),
             ]);
             setApplications(apps);
-            setCollaborations(collabs);
             setAllInvestors(investors);
+            setCollabInvites(invites);
+            setSentInvites(sent);
+            setHubInvites(hub);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -50,45 +59,60 @@ export default function InvestorDashboard({ user, apiOnline, onLogout }) {
 
     useEffect(() => { fetchAll(); }, [user._id]);
 
-    // ─── Merged list: own apps + collab apps (for My Applications tab) ───
-    const collabAppsFromCollabs = collaborations
-        .filter(c => c.lead_investor_id !== user._id) // only show collabs where I'm NOT lead (invited)
-        .map(c => {
-            const myEntry = (c.collaborators || []).find(co => co.investor_id === user._id);
-            return {
-                _id: c.application_id,
-                company_name: c.company_name,
-                entrepreneur_name: c.entrepreneur_name || "—",
-                linkedin_url: c.linkedin_url,
-                status: myEntry?.status === "assessed" ? "analyzed" : "pending",
-                analysis_result: myEntry?.analysis_result || null,
-                investor_name: c.lead_investor_name,
-                isCollab: true,
-                collabId: c._id,
-                collabStatus: myEntry?.status,
-            };
-        });
+    // ── Status normalisation ──────────────────────────────────────────────
+    // For direct apps: status is backend status (pending/analyzed/ACCEPTED/REJECTED)
+    // For collab-invite apps: collab_invite_status drives the "decision" layer
+    //   INVITED        → invited, not yet assessed
+    //   COLLAB_ASSESSED → assessed, can now accept/reject
+    //   COLLAB_ACCEPTED / COLLAB_REJECTED → final
 
-    const allApps = [...applications, ...collabAppsFromCollabs];
+    const getAppStatus = (app) => {
+        if (!app.is_collab_invite) {
+            // Direct app
+            const s = (app.status || "").toUpperCase();
+            if (s === "ACCEPTED") return "ACCEPTED";
+            if (s === "REJECTED") return "REJECTED";
+            if (s === "ANALYZED") return "analyzed";
+            return "pending";
+        } else {
+            // Collab-invite app
+            const cs = (app.collab_invite_status || "").toUpperCase();
+            if (cs === "COLLAB_ACCEPTED") return "COLLAB_ACCEPTED";
+            if (cs === "COLLAB_REJECTED") return "COLLAB_REJECTED";
+            if (cs === "COLLAB_ASSESSED") return "collab_assessed";
+            return "collab_pending"; // INVITED
+        }
+    };
 
-    // ─── Stats across the merged list ────────────────────────────────────
-    const totalCount = allApps.length;
-    const pendingCount = allApps.filter(a => a.status === "pending").length;
-    const analyzedCount = allApps.filter(a => a.status === "analyzed").length;
-    const decidedCount = allApps.filter(a => a.status === "approved" || a.status === "rejected").length;
+    // The "analysis_result" for display
+    const getAnalysisResult = (app) => {
+        if (!app.is_collab_invite) return app.analysis_result;
+        return app.collab_analysis_result;
+    };
 
-    // ─── Handlers ────────────────────────────────────────────────────────
+    // ── Counts for stats (uses unified list) ─────────────────────────────
+    const pendingApps = applications.filter(a => {
+        const s = getAppStatus(a);
+        return s === "pending" || s === "analyzed" || s === "collab_pending" || s === "collab_assessed";
+    });
+    const analyzedCount = applications.filter(a => {
+        const s = getAppStatus(a);
+        return s === "analyzed" || s === "collab_assessed";
+    }).length;
+    const decidedCount = applications.filter(a => {
+        const s = getAppStatus(a);
+        return s === "ACCEPTED" || s === "REJECTED" || s === "COLLAB_ACCEPTED" || s === "COLLAB_REJECTED";
+    }).length;
 
-    const handleAnalyze = async (appId, isCollab, collabId) => {
+    // ── Accepted direct apps (for invite collaborator flow) ──────────────
+    const acceptedDirectApps = applications.filter(a => !a.is_collab_invite && getAppStatus(a) === "ACCEPTED");
+
+    // ── Handlers ─────────────────────────────────────────────────────────
+    const handleAnalyzeDirect = async (appId) => {
         setAnalyzing(appId);
         setError("");
         try {
-            let result;
-            if (isCollab) {
-                result = await api.assessAsCollaborator(collabId, user._id);
-            } else {
-                result = await api.analyzeApplication(appId);
-            }
+            const result = await api.analyzeApplication(appId);
             setViewingResult(result);
             setViewingAppId(appId);
             await fetchAll();
@@ -99,9 +123,26 @@ export default function InvestorDashboard({ user, apiOnline, onLogout }) {
         }
     };
 
+    const handleAnalyzeCollab = async (app) => {
+        const inviteId = app.collab_invite_id;
+        setAnalyzing(inviteId);
+        setError("");
+        try {
+            const result = await api.assessCollabInvite(inviteId);
+            setViewingResult(result);
+            setViewingAppId(app._id);
+            await fetchAll();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setAnalyzing(null);
+        }
+    };
+
     const handleViewResult = (app) => {
-        if (app.analysis_result) {
-            setViewingResult(app.analysis_result);
+        const result = getAnalysisResult(app);
+        if (result) {
+            setViewingResult(result);
             setViewingAppId(app._id);
         }
     };
@@ -109,6 +150,7 @@ export default function InvestorDashboard({ user, apiOnline, onLogout }) {
     const handleDecision = async () => {
         if (!decisionModal || !decisionType) return;
         setDecidingLoading(true);
+        setError("");
         try {
             await api.setDecision(decisionModal.appId, decisionType, decisionMsg);
             setDecisionModal(null);
@@ -122,23 +164,27 @@ export default function InvestorDashboard({ user, apiOnline, onLogout }) {
         }
     };
 
-    // ─── Collaboration handlers ──────────────────────────────────────────
-
-    const openCollabModal = async (app) => {
-        let collab = await api.getCollaborationForApp(app._id);
-        if (!collab) {
-            collab = await api.createCollaboration(app._id, user._id, user.name);
+    const handleCollabDecide = async (app, decision) => {
+        setError("");
+        try {
+            await api.decideCollaborationInvite(app.collab_invite_id, decision);
+            await fetchAll();
+        } catch (err) {
+            setError(err.message);
         }
-        setCollabModal({ appId: app._id, collab, companyName: app.company_name });
+    };
+
+    const openInviteModal = (app) => {
+        setInviteModal({ appId: app._id, companyName: app.company_name });
         setInviteSearch("");
     };
 
-    const handleInvite = async (investor) => {
-        if (!collabModal) return;
+    const handleNewInvite = async (investor) => {
+        if (!inviteModal) return;
         setInviting(true);
+        setError("");
         try {
-            const updated = await api.inviteCollaborator(collabModal.collab._id, investor._id, investor.name);
-            setCollabModal({ ...collabModal, collab: updated });
+            await api.inviteCollaboratorNew(inviteModal.appId, user._id, investor._id);
             await fetchAll();
         } catch (err) {
             setError(err.message);
@@ -147,474 +193,269 @@ export default function InvestorDashboard({ user, apiOnline, onLogout }) {
         }
     };
 
-    // ─── Result View with Back + Approve/Reject ──────────────────────────
+    // ── Nav items ─────────────────────────────────────────────────────────
+    // Invites tab: only count pending (INVITED status) received invites
+    const pendingInvitesCount = collabInvites.filter(inv => inv.status === "INVITED").length;
+    const navItems = [
+        { key: "applications", label: "Applications", icon: <Inbox size={18} /> },
+        { key: "accepted", label: "Accepted", icon: <ThumbsUp size={18} /> },
+        { key: "invites", label: `Invites${pendingInvitesCount > 0 ? ` (${pendingInvitesCount})` : ""}`, icon: <Mail size={18} /> },
+        { key: "hub", label: "Collaboration Hub", icon: <Handshake size={18} /> },
+    ];
 
+    // ── Result View ───────────────────────────────────────────────────────
     if (viewingResult) {
-        const currentApp = allApps.find(a => a._id === viewingAppId);
-        const showDecisionBtns = currentApp && currentApp.status === "analyzed" && !currentApp.isCollab;
+        const currentApp = applications.find(a => a._id === viewingAppId);
+        const s = currentApp ? getAppStatus(currentApp) : null;
+
+        // Show direct decision buttons if direct app and analyzed
+        const showDirectDecision = currentApp && !currentApp.is_collab_invite && s === "analyzed";
+        // Show collab decision buttons if collab-assessed (not yet decided)
+        const showCollabDecision = currentApp && currentApp.is_collab_invite && s === "collab_assessed";
 
         return (
-            <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-                <Header user={user} apiOnline={apiOnline} onLogout={onLogout} />
-                <main className="container" style={{ flex: 1, padding: "2rem 2rem 4rem" }}>
-                    {/* Back button */}
-                    <button onClick={() => { setViewingResult(null); setViewingAppId(null); }}
-                        className="btn" style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                        <ArrowLeft size={16} /> Back to Applications
-                    </button>
-
-                    <Step4_Results result={viewingResult} onReset={() => { setViewingResult(null); setViewingAppId(null); }} />
-
-                    {/* Approve / Reject buttons after viewing results */}
-                    {showDecisionBtns && (
-                        <div className="card animate-fadeUp" style={{
-                            marginTop: "2rem", padding: "1.5rem", textAlign: "center",
-                            border: "2px solid var(--light-border)"
-                        }}>
-                            <h3 style={{ fontSize: "1.1rem", marginBottom: "0.5rem" }}>Ready to make a decision?</h3>
-                            <p style={{ color: "var(--warm-gray)", fontSize: "0.9rem", marginBottom: "1.25rem" }}>
-                                Approve this startup to advance to the next stage, or decline.
-                            </p>
-                            <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
-                                <button className="btn btn--accent"
-                                    onClick={() => {
-                                        setDecisionModal({ appId: viewingAppId, companyName: currentApp.company_name });
-                                        setDecisionType("approved");
-                                        setDecisionMsg("🎉 Congratulations! You have been selected for the next in-person pitching round. Our investment team will reach out shortly to schedule your presentation.");
-                                    }}
-                                    style={{ padding: "0.7rem 1.5rem", fontSize: "0.95rem" }}>
-                                    <ThumbsUp size={16} /> Approve & Advance
-                                </button>
-                                <button className="btn"
-                                    onClick={() => {
-                                        setDecisionModal({ appId: viewingAppId, companyName: currentApp.company_name });
-                                        setDecisionType("rejected");
-                                        setDecisionMsg("Thank you for your application. After careful review, we've decided not to proceed at this time. We appreciate your effort and wish you the best.");
-                                    }}
-                                    style={{ padding: "0.7rem 1.5rem", fontSize: "0.95rem", color: "var(--terracotta)" }}>
-                                    <ThumbsDown size={16} /> Decline
-                                </button>
-                            </div>
+            <div className="app-layout">
+                <Sidebar user={user} apiOnline={apiOnline} onLogout={onLogout} navItems={navItems} tab={tab} setTab={setTab} />
+                <div className="main-content">
+                    <div className="topbar">
+                        <div className="topbar-title">
+                            <h2>Analysis Report</h2>
+                            <p>{currentApp?.company_name || "Startup Assessment"}{currentApp?.is_collab_invite && <span style={{ marginLeft: "0.5rem", fontSize: "0.78rem", color: "var(--copper)", fontWeight: 600 }}>— Your Collaboration Assessment</span>}</p>
                         </div>
-                    )}
-                </main>
-
-                {/* ═══ Decision Modal (inlined so it works from result view) ═══ */}
-                {decisionModal && (
-                    <div style={{
-                        position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        zIndex: 100, backdropFilter: "blur(4px)"
-                    }} onClick={() => { setDecisionModal(null); setDecisionType(null); }}>
-                        <div className="card animate-scaleIn" style={{
-                            width: "100%", maxWidth: 520, padding: "2rem"
-                        }} onClick={e => e.stopPropagation()}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-                                <h3 style={{ fontSize: "1.15rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    {decisionType === "approved"
-                                        ? <><ThumbsUp size={18} color="var(--olive)" /> Approve {decisionModal.companyName}</>
-                                        : <><ThumbsDown size={18} color="var(--terracotta)" /> Decline {decisionModal.companyName}</>
-                                    }
-                                </h3>
-                                <button onClick={() => { setDecisionModal(null); setDecisionType(null); }} style={{
-                                    border: "none", background: "none", cursor: "pointer", color: "var(--warm-gray)", padding: "0.25rem"
-                                }}><X size={20} /></button>
-                            </div>
-                            <label>Message to Entrepreneur</label>
-                            <textarea value={decisionMsg}
-                                onChange={e => setDecisionMsg(e.target.value)}
-                                rows={4}
-                                style={{
-                                    width: "100%", padding: "0.75rem", borderRadius: "var(--radius-sm)",
-                                    border: "1px solid var(--medium-border)", fontFamily: "var(--font-body)",
-                                    fontSize: "0.9rem", resize: "vertical", marginBottom: "1.25rem"
-                                }}
-                            />
-                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-                                <button className="btn" onClick={() => { setDecisionModal(null); setDecisionType(null); }}>Cancel</button>
-                                <button className={`btn ${decisionType === "approved" ? "btn--accent" : "btn--primary"}`}
-                                    onClick={handleDecision} disabled={decidingLoading}
-                                    style={{
-                                        padding: "0.6rem 1.5rem",
-                                        background: decisionType === "rejected" ? "var(--terracotta)" : undefined,
-                                        color: decisionType === "rejected" ? "#fff" : undefined,
-                                    }}>
-                                    {decidingLoading ? "Sending…" : decisionType === "approved" ? "Confirm Approval" : "Confirm Decline"}
-                                </button>
-                            </div>
+                        <div className="topbar-actions">
+                            <button onClick={() => { setViewingResult(null); setViewingAppId(null); }} className="btn btn--sm">
+                                <ArrowLeft size={14} /> Back
+                            </button>
                         </div>
                     </div>
-                )}
+                    <div className="content-area">
+                        <Step4_Results result={viewingResult} onReset={() => { setViewingResult(null); setViewingAppId(null); }} />
+
+                        {showDirectDecision && (
+                            <div className="card animate-fadeUp" style={{ marginTop: "1.5rem", textAlign: "center", border: "2px solid var(--sand)" }}>
+                                <h3 style={{ fontSize: "1.1rem", marginBottom: "0.4rem" }}>Make a decision</h3>
+                                <p style={{ color: "var(--slate)", fontSize: "0.88rem", marginBottom: "1.25rem" }}>
+                                    Accept this startup to advance to the next stage, or decline.
+                                </p>
+                                <div style={{ display: "flex", justifyContent: "center", gap: "0.75rem" }}>
+                                    <button className="btn btn--forest" onClick={() => {
+                                        setDecisionModal({ appId: viewingAppId, companyName: currentApp.company_name });
+                                        setDecisionType("accepted");
+                                        setDecisionMsg("🎉 Congratulations! You have been selected for the next in-person pitching round. Our investment team will reach out shortly.");
+                                    }}>
+                                        <ThumbsUp size={16} /> Accept & Advance
+                                    </button>
+                                    <button className="btn btn--danger" onClick={() => {
+                                        setDecisionModal({ appId: viewingAppId, companyName: currentApp.company_name });
+                                        setDecisionType("rejected");
+                                        setDecisionMsg("Thank you for your application. After careful review, we've decided not to proceed at this time.");
+                                    }}>
+                                        <ThumbsDown size={16} /> Decline
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {showCollabDecision && (
+                            <div className="card animate-fadeUp" style={{ marginTop: "1.5rem", textAlign: "center", border: "2px solid var(--sand)" }}>
+                                <h3 style={{ fontSize: "1.1rem", marginBottom: "0.4rem" }}>Collaboration Decision</h3>
+                                <p style={{ color: "var(--slate)", fontSize: "0.88rem", marginBottom: "1.25rem" }}>
+                                    Based on your assessment, would you like to participate in this deal?
+                                </p>
+                                <div style={{ display: "flex", justifyContent: "center", gap: "0.75rem" }}>
+                                    <button className="btn btn--forest" onClick={() => { handleCollabDecide(currentApp, "accept"); setViewingResult(null); }}>
+                                        <ThumbsUp size={16} /> Join Deal
+                                    </button>
+                                    <button className="btn btn--danger" onClick={() => { handleCollabDecide(currentApp, "reject"); setViewingResult(null); }}>
+                                        <ThumbsDown size={16} /> Decline Invite
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {decisionModal && <DecisionModal {...{ decisionModal, setDecisionModal, decisionType, setDecisionType, decisionMsg, setDecisionMsg, decidingLoading, handleDecision }} />}
+                </div>
             </div>
         );
     }
 
-    // ─── Invitable investors for collab modal ────────────────────────────
+    // ── Invite modal: filter out already-invited investors ────────────────
+    const alreadyInvitedIds = sentInvites
+        .filter(inv => inv.application_id === inviteModal?.appId)
+        .map(inv => inv.collaborator_investor_id);
 
-    const alreadyInvitedIds = collabModal
-        ? [collabModal.collab.lead_investor_id, ...(collabModal.collab.collaborators || []).map(c => c.investor_id)]
-        : [];
     const invitableInvestors = allInvestors.filter(inv =>
+        inv._id !== user._id &&
         !alreadyInvitedIds.includes(inv._id) &&
         (inv.name.toLowerCase().includes(inviteSearch.toLowerCase()) ||
             (inv.sectors || []).some(s => s.toLowerCase().includes(inviteSearch.toLowerCase())))
     );
 
-    // ─── Main Render ─────────────────────────────────────────────────────
+    const tabTitles = {
+        applications: { title: "All Applications", desc: "Your direct applications and collaboration invites you haven't decided on" },
+        accepted: { title: "Accepted Startups", desc: "Startups you've accepted — invite co-investors to collaborate" },
+        invites: { title: "Pending Invites", desc: "Pending collaboration invitations waiting for your assessment and decision" },
+        hub: { title: "Collaboration Hub", desc: "All accepted and rejected collaboration deals — sent or received" },
+    };
 
     return (
-        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-            <Header user={user} apiOnline={apiOnline} onLogout={onLogout} />
+        <div className="app-layout">
+            <Sidebar user={user} apiOnline={apiOnline} onLogout={onLogout} navItems={navItems} tab={tab} setTab={setTab} />
 
-            <main className="container" style={{ flex: 1, padding: "2rem 2rem 4rem" }}>
-                <div className="animate-fadeUp">
-                    {/* Tabs + Refresh Row */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem", flexWrap: "wrap", gap: "1rem" }}>
-                        <div style={{
-                            display: "flex", gap: "0.5rem",
-                            background: "var(--bg-elevated)", borderRadius: "var(--radius-full)", padding: "4px"
-                        }}>
-                            {[
-                                { key: "applications", label: "Pending Applications" },
-                                { key: "approved", label: "Approved", icon: <ThumbsUp size={14} /> },
-                                { key: "collabs", label: "Collaboration Hub", icon: <Handshake size={14} /> }
-                            ].map(t => (
-                                <button key={t.key} onClick={() => setTab(t.key)} style={{
-                                    padding: "0.5rem 1.25rem", border: "none",
-                                    borderRadius: "var(--radius-full)", cursor: "pointer",
-                                    fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 600,
-                                    background: tab === t.key ? "var(--bg-card)" : "transparent",
-                                    color: tab === t.key ? "var(--charcoal)" : "var(--warm-gray)",
-                                    boxShadow: tab === t.key ? "var(--shadow-sm)" : "none",
-                                    transition: "all 0.2s ease",
-                                    display: "flex", alignItems: "center", gap: "0.4rem"
-                                }}>
-                                    {t.icon}
-                                    {t.label}
-                                </button>
-                            ))}
-                        </div>
-                        <button className="btn" onClick={fetchAll} style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>
-                            <RefreshCw size={15} /> Refresh
+            <div className="main-content">
+                <div className="topbar">
+                    <div className="topbar-title">
+                        <h2>{tabTitles[tab]?.title}</h2>
+                        <p>{tabTitles[tab]?.desc}</p>
+                    </div>
+                    <div className="topbar-actions">
+                        <button className="btn btn--sm btn--ghost" onClick={fetchAll}>
+                            <RefreshCw size={14} /> Refresh
                         </button>
                     </div>
+                </div>
 
-                    {error && (
-                        <div style={{
-                            padding: "0.75rem 1rem", borderRadius: "var(--radius-sm)",
-                            background: "var(--danger-bg)", color: "var(--terracotta-dark)",
-                            fontSize: "0.9rem", marginBottom: "1rem"
-                        }}>{error}</div>
-                    )}
-
-                    {/* Analyzing overlay */}
-                    {analyzing && (
-                        <div className="card animate-scaleIn" style={{
-                            textAlign: "center", padding: "3rem", marginBottom: "1.5rem",
-                            background: "var(--bg-elevated)"
-                        }}>
+                <div className="content-area">
+                    <div className="animate-fadeUp">
+                        {error && (
                             <div style={{
-                                width: 80, height: 80, margin: "0 auto 1.5rem",
-                                borderRadius: "50%", border: "4px solid var(--light-border)",
-                                borderTopColor: "var(--terracotta)",
-                                animation: "rotateGeo 1s linear infinite"
-                            }} />
-                            <h3 style={{ fontSize: "1.3rem", marginBottom: "0.5rem" }}>Running AI Analysis</h3>
-                            <p style={{ color: "var(--warm-gray)" }}>Scraping LinkedIn, extracting profiles, running simulations…</p>
-                        </div>
-                    )}
+                                padding: "0.75rem 1rem", borderRadius: "var(--radius-md)",
+                                background: "var(--danger-bg)", border: "1px solid var(--danger-border)",
+                                color: "var(--danger)", fontSize: "0.88rem", marginBottom: "1rem"
+                            }}>{error}</div>
+                        )}
 
-                    {/* ═══ Applications Tab ═══ */}
-                    {tab === "applications" && (
-                        <>
-                            <div style={{ marginBottom: "1.5rem" }}>
-                                <h2 style={{ fontSize: "1.8rem", marginBottom: "0.3rem" }}>Pending Applications</h2>
-                                <p style={{ color: "var(--warm-gray)" }}>Review and assess startups awaiting your decision.</p>
+                        {analyzing && (
+                            <div className="card animate-scaleIn" style={{ textAlign: "center", padding: "2.5rem", marginBottom: "1.5rem", background: "var(--cream-dark)" }}>
+                                <div style={{
+                                    width: 64, height: 64, margin: "0 auto 1.25rem",
+                                    borderRadius: "50%", border: "3px solid var(--sand)",
+                                    borderTopColor: "var(--forest)",
+                                    animation: "rotateGeo 1s linear infinite"
+                                }} />
+                                <h3 style={{ marginBottom: "0.4rem" }}>Running AI Analysis</h3>
+                                <p style={{ color: "var(--slate)", fontSize: "0.88rem" }}>Scraping LinkedIn, extracting profiles, running simulations…</p>
                             </div>
+                        )}
 
-                            {/* 4 Stat Cards */}
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "2rem" }}>
-                                <StatCard label="Total" value={totalCount} icon={<Users size={18} />} bg="var(--bg-elevated)" />
-                                <StatCard label="Pending" value={pendingCount} icon={<Clock size={18} />} bg="var(--warning-bg)" />
-                                <StatCard label="Analyzed" value={analyzedCount} icon={<CheckCircle size={18} />} bg="var(--success-bg)" />
-                                <StatCard label="Decided" value={decidedCount} icon={<Award size={18} />} bg="var(--gold-light)" />
-                            </div>
-
-                            {(() => {
-                                const pendingApps = allApps.filter(a => a.status === "pending" || a.status === "analyzed");
-                                if (loading) return <div style={{ textAlign: "center", padding: "3rem", color: "var(--warm-gray)" }}>Loading…</div>;
-                                if (pendingApps.length === 0) return (
-                                    <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
-                                        <FileText size={48} color="var(--light-border)" style={{ marginBottom: "1rem" }} />
-                                        <p style={{ color: "var(--warm-gray)", fontSize: "1.1rem" }}>No pending applications.</p>
-                                    </div>
-                                );
-                                return (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                                        {pendingApps.map((app, idx) => (
-                                            <div key={`${app._id}-${idx}`} className="card" style={{ padding: "1.25rem 1.5rem" }}>
-                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
-                                                    <div style={{ flex: 1, minWidth: 200 }}>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                                                            <div style={{
-                                                                width: 38, height: 38, borderRadius: "50%",
-                                                                background: "var(--bg-elevated)", display: "flex",
-                                                                alignItems: "center", justifyContent: "center",
-                                                                fontWeight: 700, fontSize: "0.9rem", color: "var(--charcoal)"
-                                                            }}>
-                                                                {app.company_name?.charAt(0) || "?"}
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                                    <span style={{ fontWeight: 700, fontSize: "1.05rem" }}>{app.company_name}</span>
-                                                                    {app.isCollab && (
-                                                                        <span className="badge badge--yellow" style={{ fontSize: "0.6rem", padding: "0.1rem 0.4rem" }}>
-                                                                            <Handshake size={10} /> Collab
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div style={{ fontSize: "0.8rem", color: "var(--warm-gray)" }}>
-                                                                    by {app.entrepreneur_name}
-                                                                    {app.isCollab && <> • via <strong>{app.investor_name}</strong></>}
-                                                                </div>
-                                                                {app.linkedin_url && (
-                                                                    <a href={app.linkedin_url} target="_blank" rel="noreferrer"
-                                                                        style={{ fontSize: "0.72rem", color: "var(--olive)", display: "flex", alignItems: "center", gap: "0.2rem", textDecoration: "none", marginTop: "0.1rem" }}>
-                                                                        <Linkedin size={11} /> LinkedIn Profile
-                                                                    </a>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-                                                        <StatusBadge status={app.status} />
-
-                                                        {(app.status === "pending") && (
-                                                            <button className="btn btn--accent" onClick={() => handleAnalyze(app._id, app.isCollab, app.collabId)}
-                                                                disabled={analyzing !== null}
-                                                                style={{ padding: "0.5rem 1rem", fontSize: "0.82rem" }}>
-                                                                <PlayCircle size={14} /> Assess
-                                                            </button>
-                                                        )}
-
-                                                        {(app.status === "analyzed" || app.status === "approved" || app.status === "rejected") && (
-                                                            <button className="btn" onClick={() => handleViewResult(app)}
-                                                                style={{ padding: "0.5rem 1rem", fontSize: "0.82rem" }}>
-                                                                <Eye size={14} /> Report
-                                                            </button>
-                                                        )}
-
-                                                        {app.status === "analyzed" && !app.isCollab && (
-                                                            <>
-                                                                <button className="btn btn--accent"
-                                                                    onClick={() => {
-                                                                        setDecisionModal({ appId: app._id, companyName: app.company_name });
-                                                                        setDecisionType("approved");
-                                                                        setDecisionMsg("🎉 Congratulations! You have been selected for the next in-person pitching round. Our investment team will reach out shortly to schedule your presentation.");
-                                                                    }}
-                                                                    style={{ padding: "0.5rem 0.85rem", fontSize: "0.82rem" }}>
-                                                                    <ThumbsUp size={14} /> Approve
-                                                                </button>
-                                                                <button className="btn"
-                                                                    onClick={() => {
-                                                                        setDecisionModal({ appId: app._id, companyName: app.company_name });
-                                                                        setDecisionType("rejected");
-                                                                        setDecisionMsg("Thank you for your application. After careful review, we've decided not to proceed at this time. We wish you success in your future endeavors.");
-                                                                    }}
-                                                                    style={{ padding: "0.5rem 0.85rem", fontSize: "0.82rem", color: "var(--terracotta)" }}>
-                                                                    <ThumbsDown size={14} /> Decline
-                                                                </button>
-                                                            </>
-                                                        )}
-
-                                                        {!app.isCollab && (
-                                                            <button className="btn" onClick={() => openCollabModal(app)}
-                                                                style={{ padding: "0.5rem 1rem", fontSize: "0.82rem" }}>
-                                                                <Handshake size={14} /> Collaborate
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Show decision message inline */}
-                                                {(app.status === "approved" || app.status === "rejected") && app.decision_message && (
-                                                    <div style={{
-                                                        marginTop: "0.75rem", padding: "0.75rem 1rem",
-                                                        borderRadius: "var(--radius-sm)",
-                                                        background: app.status === "approved" ? "var(--success-bg)" : "var(--danger-bg)",
-                                                        fontSize: "0.85rem",
-                                                        color: app.status === "approved" ? "var(--olive-dark)" : "var(--terracotta-dark)"
-                                                    }}>
-                                                        {app.decision_message}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}</div>
-                                );
-                            })()}
-                        </>
-                    )}
-
-                    {/* ═══ Approved Tab ═══ */}
-                    {tab === "approved" && (
-                        <>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
-                                <div>
-                                    <h2 style={{ fontSize: "1.8rem", marginBottom: "0.15rem" }}>Approved Startups</h2>
-                                    <p style={{ color: "var(--warm-gray)" }}>Startups you've approved for the next stage.</p>
+                        {/* ═══ Applications Tab ═══ */}
+                        {tab === "applications" && (
+                            <>
+                                {/* Stat row */}
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+                                    <StatCard label="Total" value={applications.length} icon={<Users size={18} />} bg="var(--cream-dark)" iconBg="var(--sand-light)" />
+                                    <StatCard label="Pending / Active" value={pendingApps.length} icon={<Clock size={18} />} bg="var(--warning-bg)" iconBg="var(--warning-border)" />
+                                    <StatCard label="Analyzed" value={analyzedCount} icon={<CheckCircle size={18} />} bg="var(--success-bg)" iconBg="var(--success-border)" />
+                                    <StatCard label="Decided" value={decidedCount} icon={<Award size={18} />} bg="var(--sage-light)" iconBg="var(--sage-muted)" />
                                 </div>
-                            </div>
 
-                            {(() => {
-                                const approvedApps = applications.filter(a => a.status === "approved");
-                                if (loading) return <div style={{ textAlign: "center", padding: "3rem", color: "var(--warm-gray)" }}>Loading…</div>;
-                                if (approvedApps.length === 0) return (
+                                {loading ? (
+                                    <div style={{ textAlign: "center", padding: "3rem", color: "var(--slate)" }}>Loading…</div>
+                                ) : applications.length === 0 ? (
                                     <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
-                                        <ThumbsUp size={48} color="var(--light-border)" style={{ marginBottom: "1rem" }} />
-                                        <p style={{ color: "var(--warm-gray)", fontSize: "1.1rem" }}>No approved startups yet.</p>
-                                        <p style={{ color: "var(--warm-gray)", fontSize: "0.9rem", marginTop: "0.5rem" }}>
-                                            Assess an application and approve it to see it here.
-                                        </p>
+                                        <FileText size={48} color="var(--sand)" style={{ marginBottom: "1rem" }} />
+                                        <p style={{ color: "var(--slate)", fontSize: "1.05rem", fontWeight: 500 }}>No applications yet.</p>
                                     </div>
-                                );
-                                return (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                                        {approvedApps.map(app => (
-                                            <div key={app._id} className="card" style={{
-                                                padding: "1.5rem",
-                                                borderLeft: "4px solid var(--olive)"
-                                            }}>
-                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+                                ) : (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                                        {applications.map((app, idx) => {
+                                            const appStatus = getAppStatus(app);
+                                            const result = getAnalysisResult(app);
+                                            const isAnalyzing = analyzing === app._id || analyzing === app.collab_invite_id;
+                                            return (
+                                                <AppCard
+                                                    key={`${app._id}-${idx}`}
+                                                    app={app}
+                                                    appStatus={appStatus}
+                                                    hasResult={!!result}
+                                                    isAnalyzing={isAnalyzing}
+                                                    anyAnalyzing={analyzing !== null}
+                                                    onAnalyze={() => app.is_collab_invite ? handleAnalyzeCollab(app) : handleAnalyzeDirect(app._id)}
+                                                    onViewResult={() => handleViewResult(app)}
+                                                    onAccept={() => {
+                                                        setDecisionModal({ appId: app._id, companyName: app.company_name });
+                                                        setDecisionType("accepted");
+                                                        setDecisionMsg("🎉 Congratulations! You've been selected for the next round.");
+                                                    }}
+                                                    onReject={() => {
+                                                        setDecisionModal({ appId: app._id, companyName: app.company_name });
+                                                        setDecisionType("rejected");
+                                                        setDecisionMsg("Thank you for your application. We've decided not to proceed at this time.");
+                                                    }}
+                                                    onCollabAccept={() => handleCollabDecide(app, "accept")}
+                                                    onCollabReject={() => handleCollabDecide(app, "reject")}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* ═══ Accepted Tab ═══ */}
+                        {tab === "accepted" && (
+                            loading ? (
+                                <div style={{ textAlign: "center", padding: "3rem", color: "var(--slate)" }}>Loading…</div>
+                            ) : acceptedDirectApps.length === 0 ? (
+                                <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
+                                    <ThumbsUp size={48} color="var(--sand)" style={{ marginBottom: "1rem" }} />
+                                    <p style={{ color: "var(--slate)", fontSize: "1.05rem", fontWeight: 500 }}>No accepted startups yet.</p>
+                                    <p style={{ color: "var(--slate)", fontSize: "0.88rem", marginTop: "0.4rem" }}>Assess and accept applications from the Applications tab.</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                                    {acceptedDirectApps.map(app => {
+                                        const appSentInvites = sentInvites.filter(inv => inv.application_id === app._id);
+                                        return (
+                                            <div key={app._id} className="card" style={{ padding: "1.25rem 1.35rem", borderLeft: "4px solid var(--forest-lighter)" }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.85rem" }}>
                                                     <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
                                                         <div style={{
-                                                            width: 44, height: 44, borderRadius: "50%",
+                                                            width: 42, height: 42, borderRadius: "var(--radius-full)",
                                                             background: "var(--success-bg)", display: "flex",
                                                             alignItems: "center", justifyContent: "center",
-                                                            fontWeight: 700, fontSize: "1rem", color: "var(--olive-dark)"
+                                                            fontWeight: 700, fontSize: "1rem", color: "var(--success)",
+                                                            border: "1px solid var(--success-border)"
                                                         }}>
                                                             {app.company_name?.charAt(0) || "?"}
                                                         </div>
                                                         <div>
-                                                            <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{app.company_name}</div>
-                                                            <div style={{ fontSize: "0.82rem", color: "var(--warm-gray)" }}>
-                                                                by {app.entrepreneur_name}
-                                                            </div>
-                                                            {app.linkedin_url && (
-                                                                <a href={app.linkedin_url} target="_blank" rel="noreferrer"
-                                                                    style={{ fontSize: "0.72rem", color: "var(--olive)", display: "flex", alignItems: "center", gap: "0.2rem", textDecoration: "none", marginTop: "0.1rem" }}>
-                                                                    <Linkedin size={11} /> LinkedIn Profile
-                                                                </a>
-                                                            )}
+                                                            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>{app.company_name}</div>
+                                                            <div style={{ fontSize: "0.8rem", color: "var(--slate)" }}>by {app.entrepreneur_name}</div>
                                                         </div>
                                                     </div>
                                                     <div style={{ display: "flex", gap: "0.5rem" }}>
-                                                        <span className="badge badge--green" style={{ alignSelf: "center" }}>
-                                                            <ThumbsUp size={12} /> Approved
-                                                        </span>
+                                                        <span className="badge badge--green"><ThumbsUp size={11} /> Accepted</span>
                                                         {app.analysis_result && (
-                                                            <button className="btn" onClick={() => handleViewResult(app)}
-                                                                style={{ padding: "0.5rem 1rem", fontSize: "0.82rem" }}>
-                                                                <Eye size={14} /> Report
-                                                            </button>
+                                                            <button className="btn btn--sm" onClick={() => handleViewResult(app)}><Eye size={13} /> Report</button>
                                                         )}
-                                                    </div>
-                                                </div>
-                                                {app.decision_message && (
-                                                    <div style={{
-                                                        marginTop: "0.85rem", padding: "0.75rem 1rem",
-                                                        borderRadius: "var(--radius-sm)", background: "var(--success-bg)",
-                                                        fontSize: "0.88rem", color: "var(--olive-dark)", lineHeight: 1.5
-                                                    }}>
-                                                        {app.decision_message}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                );
-                            })()}
-                        </>
-                    )}
-
-                    {/* ═══ Collaborations Tab ═══ */}
-                    {tab === "collabs" && (
-                        <>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
-                                <button onClick={() => setTab("applications")} className="btn"
-                                    style={{ padding: "0.4rem 0.7rem", fontSize: "0.82rem" }}>
-                                    <ArrowLeft size={14} />
-                                </button>
-                                <div>
-                                    <h2 style={{ fontSize: "1.8rem", marginBottom: "0.15rem" }}>Collaboration Hub</h2>
-                                    <p style={{ color: "var(--warm-gray)" }}>Deals you're collaborating on with other investors.</p>
-                                </div>
-                            </div>
-
-                            {collaborations.length === 0 ? (
-                                <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
-                                    <Handshake size={48} color="var(--light-border)" style={{ marginBottom: "1rem" }} />
-                                    <p style={{ color: "var(--warm-gray)", fontSize: "1.1rem" }}>No collaborations yet.</p>
-                                    <p style={{ color: "var(--warm-gray)", fontSize: "0.9rem", marginTop: "0.5rem" }}>
-                                        Click "Collaborate" on an application to start one.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                                    {collaborations.map(collab => {
-                                        const isLead = collab.lead_investor_id === user._id;
-                                        const myEntry = (collab.collaborators || []).find(c => c.investor_id === user._id);
-
-                                        return (
-                                            <div key={collab._id} className="card" style={{ padding: "1.5rem" }}>
-                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
-                                                    <div>
-                                                        <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{collab.company_name}</div>
-                                                        <div style={{ fontSize: "0.82rem", color: "var(--warm-gray)", marginTop: "0.15rem" }}>
-                                                            by {collab.entrepreneur_name} • Lead: <strong>{collab.lead_investor_name}</strong>
-                                                        </div>
-                                                        {isLead && <span className="badge badge--yellow" style={{ marginTop: "0.5rem" }}>You are lead</span>}
-                                                    </div>
-                                                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                                                        {isLead && (
-                                                            <button className="btn" onClick={() => {
-                                                                setCollabModal({ appId: collab.application_id, collab, companyName: collab.company_name });
-                                                                setInviteSearch("");
-                                                            }}
-                                                                style={{ padding: "0.5rem 1rem", fontSize: "0.82rem" }}>
-                                                                <UserPlus size={14} /> Invite
-                                                            </button>
-                                                        )}
+                                                        <button className="btn btn--forest btn--sm" onClick={() => openInviteModal(app)}>
+                                                            <UserPlus size={13} /> Invite Co-Investor
+                                                        </button>
                                                     </div>
                                                 </div>
 
-                                                {(collab.collaborators || []).length > 0 && (
-                                                    <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--light-border)" }}>
-                                                        <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--warm-gray)", marginBottom: "0.5rem" }}>
-                                                            Co-Investors
+                                                {appSentInvites.length > 0 && (
+                                                    <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--sand)" }}>
+                                                        <div style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--slate)", marginBottom: "0.5rem" }}>
+                                                            Collaboration Invites
                                                         </div>
                                                         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                                                            {collab.collaborators.map((c, i) => (
+                                                            {appSentInvites.map((inv, i) => (
                                                                 <div key={i} style={{
                                                                     display: "flex", alignItems: "center", gap: "0.4rem",
-                                                                    padding: "0.35rem 0.75rem",
-                                                                    borderRadius: "var(--radius-full)",
-                                                                    background: "var(--bg-elevated)",
-                                                                    fontSize: "0.82rem", fontWeight: 600,
-                                                                    border: "1px solid var(--light-border)"
+                                                                    padding: "0.3rem 0.7rem", borderRadius: "var(--radius-full)",
+                                                                    background: "var(--cream-dark)", fontSize: "0.8rem",
+                                                                    fontWeight: 600, border: "1px solid var(--sand)"
                                                                 }}>
-                                                                    <div style={{
-                                                                        width: 22, height: 22, borderRadius: "50%",
-                                                                        background: c.status === "assessed" ? "var(--olive)" : "var(--warm-gray)",
-                                                                        color: "#fff", display: "flex", alignItems: "center",
-                                                                        justifyContent: "center", fontSize: "0.6rem", fontWeight: 700
+                                                                    {inv.collaborator_investor_name}
+                                                                    <span className="badge" style={{
+                                                                        padding: "0.1rem 0.35rem", fontSize: "0.6rem",
+                                                                        background: inv.status === "COLLAB_ACCEPTED" ? "var(--success-bg)" : inv.status === "COLLAB_REJECTED" ? "var(--danger-bg)" : "var(--warning-bg)",
+                                                                        color: inv.status === "COLLAB_ACCEPTED" ? "var(--success)" : inv.status === "COLLAB_REJECTED" ? "var(--danger)" : "var(--warning)",
+                                                                        border: `1px solid ${inv.status === "COLLAB_ACCEPTED" ? "var(--success-border)" : inv.status === "COLLAB_REJECTED" ? "var(--danger-border)" : "var(--warning-border)"}`
                                                                     }}>
-                                                                        {c.investor_name?.charAt(0) || "?"}
-                                                                    </div>
-                                                                    {c.investor_name}
-                                                                    <span className={`badge ${c.status === "assessed" ? "badge--green" : "badge--yellow"}`}
-                                                                        style={{ padding: "0.15rem 0.4rem", fontSize: "0.65rem" }}>
-                                                                        {c.status}
+                                                                        {inv.status === "COLLAB_ACCEPTED" ? "Joined" : inv.status === "COLLAB_REJECTED" ? "Declined" : inv.status === "COLLAB_ASSESSED" ? "Assessed" : "Pending"}
                                                                     </span>
                                                                 </div>
                                                             ))}
@@ -625,182 +466,423 @@ export default function InvestorDashboard({ user, apiOnline, onLogout }) {
                                         );
                                     })}
                                 </div>
-                            )}
-                        </>
+                            )
+                        )}
+
+                        {/* ═══ Invites Tab — PENDING ONLY ═══ */}
+                        {tab === "invites" && (() => {
+                            const pendingOnly = collabInvites.filter(inv => inv.status === "INVITED" || inv.status === "COLLAB_ASSESSED");
+                            return pendingOnly.length === 0 ? (
+                                <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
+                                    <Mail size={48} color="var(--sand)" style={{ marginBottom: "1rem" }} />
+                                    <p style={{ color: "var(--slate)", fontSize: "1.05rem", fontWeight: 500 }}>No pending invites.</p>
+                                    <p style={{ color: "var(--slate)", fontSize: "0.88rem", marginTop: "0.4rem" }}>
+                                        Invitations from other investors that you haven't responded to yet will appear here.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                                    {pendingOnly.map(invite => {
+                                        const appEntry = applications.find(a => a.is_collab_invite && a.collab_invite_id === invite._id);
+                                        const cs = (invite.status || "").toUpperCase();
+                                        const isPending = cs === "INVITED";
+                                        const isAssessed = cs === "COLLAB_ASSESSED";
+                                        return (
+                                            <div key={invite._id} className="card" style={{
+                                                padding: "1.25rem 1.35rem",
+                                                borderLeft: `4px solid ${isAssessed ? "var(--success)" : "var(--copper)"}`
+                                            }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.85rem" }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>{invite.startup_company_name}</div>
+                                                        <div style={{ fontSize: "0.8rem", color: "var(--slate)", marginTop: "0.1rem" }}>
+                                                            Invited by <strong>{invite.invited_by_investor_name}</strong>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                                                        {isPending && <span className="badge badge--yellow"><Clock size={10} /> Invited — assess first</span>}
+                                                        {isAssessed && <span className="badge badge--green"><CheckCircle size={10} /> Assessed — decide now</span>}
+
+                                                        {/* Assess button */}
+                                                        {(isPending || isAssessed) && appEntry && (
+                                                            <button className="btn btn--forest btn--sm"
+                                                                onClick={() => handleAnalyzeCollab(appEntry)}
+                                                                disabled={analyzing !== null}>
+                                                                <PlayCircle size={13} /> {isAssessed ? "Re-Assess" : "Assess"}
+                                                            </button>
+                                                        )}
+
+                                                        {/* View report */}
+                                                        {isAssessed && invite.analysis_result && (
+                                                            <button className="btn btn--sm" onClick={() => {
+                                                                setViewingResult(invite.analysis_result);
+                                                                setViewingAppId(appEntry?._id || null);
+                                                            }}>
+                                                                <Eye size={13} /> Report
+                                                            </button>
+                                                        )}
+
+                                                        {/* Accept / Reject — only after assessing */}
+                                                        {isAssessed && (
+                                                            <>
+                                                                <button className="btn btn--success btn--sm"
+                                                                    onClick={() => handleCollabDecide({ collab_invite_id: invite._id }, "accept")}>
+                                                                    <ThumbsUp size={13} /> Join
+                                                                </button>
+                                                                <button className="btn btn--danger btn--sm"
+                                                                    onClick={() => handleCollabDecide({ collab_invite_id: invite._id }, "reject")}>
+                                                                    <ThumbsDown size={13} /> Decline
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {isPending && (
+                                                    <div style={{
+                                                        marginTop: "0.65rem", padding: "0.5rem 0.85rem",
+                                                        borderRadius: "var(--radius-md)",
+                                                        background: "var(--warning-bg)", border: "1px solid var(--warning-border)",
+                                                        fontSize: "0.8rem", color: "var(--warning)"
+                                                    }}>
+                                                        ⚠️ You must <strong>Assess</strong> this application before you can accept or decline.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
+
+                        {/* ═══ Collaboration Hub Tab ═══ */}
+                        {tab === "hub" && (
+                            hubInvites.length === 0 ? (
+                                <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
+                                    <Handshake size={48} color="var(--sand)" style={{ marginBottom: "1rem" }} />
+                                    <p style={{ color: "var(--slate)", fontSize: "1.05rem", fontWeight: 500 }}>No decided collaborations yet.</p>
+                                    <p style={{ color: "var(--slate)", fontSize: "0.88rem", marginTop: "0.4rem" }}>
+                                        Accepted and rejected collaboration deals (both sent and received) will appear here.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                                    {hubInvites.map(invite => {
+                                        const isAccepted = invite.status === "COLLAB_ACCEPTED";
+                                        const iSent = invite.invited_by_investor_id === user._id;
+                                        return (
+                                            <div key={invite._id} className="card" style={{
+                                                padding: "1.25rem 1.35rem",
+                                                borderLeft: `4px solid ${isAccepted ? "var(--forest-lighter)" : "var(--danger)"}`
+                                            }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.85rem" }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>{invite.startup_company_name}</div>
+                                                        <div style={{ fontSize: "0.8rem", color: "var(--slate)", marginTop: "0.15rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                                                            {iSent ? (
+                                                                <span>You invited <strong>{invite.collaborator_investor_name}</strong></span>
+                                                            ) : (
+                                                                <span>Invited by <strong>{invite.invited_by_investor_name}</strong></span>
+                                                            )}
+                                                            <span style={{ color: "var(--sand)", fontSize: "0.8rem" }}>•</span>
+                                                            <span className={`badge ${isAccepted ? "badge--green" : ""}`}
+                                                                style={!isAccepted ? { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger-border)" } : {}}>
+                                                                {isAccepted ? <><ThumbsUp size={10} /> Accepted</> : <><ThumbsDown size={10} /> Declined</>}
+                                                            </span>
+                                                        </div>
+                                                        {invite.decision_timestamp && (
+                                                            <div style={{ fontSize: "0.7rem", color: "var(--slate)", marginTop: "0.2rem" }}>
+                                                                {new Date(invite.decision_timestamp).toLocaleDateString()}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* Role badge */}
+                                                    <span className={`badge ${iSent ? "badge--copper" : "badge--forest"}`}
+                                                        style={{ fontSize: "0.7rem" }}>
+                                                        {iSent ? "You Invited" : "You Were Invited"}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )
+                        )}
+                    </div>
+
+                    {/* ═══ Decision Modal ═══ */}
+                    {decisionModal && <DecisionModal {...{ decisionModal, setDecisionModal, decisionType, setDecisionType, decisionMsg, setDecisionMsg, decidingLoading, handleDecision }} />}
+
+                    {/* ═══ Invite Collaborator Modal ═══ */}
+                    {inviteModal && (
+                        <div className="modal-overlay" onClick={() => setInviteModal(null)}>
+                            <div className="modal-card" style={{ maxHeight: "80vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                                    <div>
+                                        <h3 style={{ fontSize: "1.15rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                            <UserPlus size={18} color="var(--forest)" /> Invite Co-Investor — {inviteModal.companyName}
+                                        </h3>
+                                        <p style={{ fontSize: "0.8rem", color: "var(--slate)", marginTop: "0.2rem" }}>
+                                            The invited investor will see this application in their dashboard and can assess it.
+                                        </p>
+                                    </div>
+                                    <button onClick={() => setInviteModal(null)} style={{ border: "none", background: "none", cursor: "pointer", color: "var(--slate)", padding: "0.25rem" }}>
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                {/* Already invited */}
+                                {sentInvites.filter(inv => inv.application_id === inviteModal.appId).length > 0 && (
+                                    <div style={{ marginBottom: "1.25rem" }}>
+                                        <label>Already Invited</label>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                                            {sentInvites.filter(inv => inv.application_id === inviteModal.appId).map((inv, i) => (
+                                                <div key={i} style={{
+                                                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                                                    padding: "0.5rem 0.75rem", borderRadius: "var(--radius-md)", background: "var(--cream-dark)"
+                                                }}>
+                                                    <span style={{ fontWeight: 600, fontSize: "0.88rem" }}>{inv.collaborator_investor_name}</span>
+                                                    <span className="badge" style={{
+                                                        fontSize: "0.65rem",
+                                                        background: inv.status === "COLLAB_ACCEPTED" ? "var(--success-bg)" : inv.status === "COLLAB_REJECTED" ? "var(--danger-bg)" : "var(--warning-bg)",
+                                                        color: inv.status === "COLLAB_ACCEPTED" ? "var(--success)" : inv.status === "COLLAB_REJECTED" ? "var(--danger)" : "var(--warning)",
+                                                        border: `1px solid ${inv.status === "COLLAB_ACCEPTED" ? "var(--success-border)" : inv.status === "COLLAB_REJECTED" ? "var(--danger-border)" : "var(--warning-border)"}`
+                                                    }}>
+                                                        {inv.status === "COLLAB_ACCEPTED" ? "Joined" : inv.status === "COLLAB_REJECTED" ? "Declined" : inv.status === "COLLAB_ASSESSED" ? "Assessed" : "Pending"}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <label>Add New Co-Investor</label>
+                                <div style={{ position: "relative", marginBottom: "0.75rem" }}>
+                                    <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--slate)" }} />
+                                    <input type="text" placeholder="Search investors…"
+                                        value={inviteSearch} onChange={e => setInviteSearch(e.target.value)}
+                                        style={{ paddingLeft: "2rem", fontSize: "0.85rem" }} />
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: 220, overflowY: "auto" }}>
+                                    {invitableInvestors.map(inv => (
+                                        <div key={inv._id} style={{
+                                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                                            padding: "0.6rem 0.85rem", borderRadius: "var(--radius-md)",
+                                            border: "1px solid var(--sand)", background: "var(--white)"
+                                        }}>
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: "0.88rem" }}>{inv.name}</div>
+                                                <div style={{ fontSize: "0.7rem", color: "var(--slate)" }}>
+                                                    {inv.investor_type?.replace("_", " ")} • {(inv.sectors || []).slice(0, 3).join(", ")}
+                                                </div>
+                                            </div>
+                                            <button className="btn btn--forest btn--sm" onClick={() => handleNewInvite(inv)} disabled={inviting}>
+                                                <UserPlus size={12} /> Invite
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {invitableInvestors.length === 0 && (
+                                        <p style={{ textAlign: "center", color: "var(--slate)", fontSize: "0.85rem", padding: "1rem" }}>
+                                            No available investors to invite.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
-
-                {/* ═══ Decision Modal ═══ */}
-                {decisionModal && (
-                    <div style={{
-                        position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        zIndex: 100, backdropFilter: "blur(4px)"
-                    }} onClick={() => { setDecisionModal(null); setDecisionType(null); }}>
-                        <div className="card animate-scaleIn" style={{
-                            width: "100%", maxWidth: 520, padding: "2rem"
-                        }} onClick={e => e.stopPropagation()}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-                                <h3 style={{ fontSize: "1.15rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    {decisionType === "approved"
-                                        ? <><ThumbsUp size={18} color="var(--olive)" /> Approve {decisionModal.companyName}</>
-                                        : <><ThumbsDown size={18} color="var(--terracotta)" /> Decline {decisionModal.companyName}</>
-                                    }
-                                </h3>
-                                <button onClick={() => { setDecisionModal(null); setDecisionType(null); }} style={{
-                                    border: "none", background: "none", cursor: "pointer", color: "var(--warm-gray)", padding: "0.25rem"
-                                }}><X size={20} /></button>
-                            </div>
-
-                            <label>Message to Entrepreneur</label>
-                            <textarea value={decisionMsg}
-                                onChange={e => setDecisionMsg(e.target.value)}
-                                rows={4}
-                                style={{
-                                    width: "100%", padding: "0.75rem", borderRadius: "var(--radius-sm)",
-                                    border: "1px solid var(--medium-border)", fontFamily: "var(--font-body)",
-                                    fontSize: "0.9rem", resize: "vertical", marginBottom: "1.25rem"
-                                }}
-                            />
-
-                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-                                <button className="btn" onClick={() => { setDecisionModal(null); setDecisionType(null); }}>Cancel</button>
-                                <button className={`btn ${decisionType === "approved" ? "btn--accent" : "btn--primary"}`}
-                                    onClick={handleDecision} disabled={decidingLoading}
-                                    style={{
-                                        padding: "0.6rem 1.5rem",
-                                        background: decisionType === "rejected" ? "var(--terracotta)" : undefined,
-                                        color: decisionType === "rejected" ? "#fff" : undefined,
-                                    }}>
-                                    {decidingLoading ? "Sending…" : decisionType === "approved" ? "Confirm Approval" : "Confirm Decline"}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* ═══ Collaboration Modal ═══ */}
-                {collabModal && (
-                    <div style={{
-                        position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        zIndex: 100, backdropFilter: "blur(4px)"
-                    }} onClick={() => setCollabModal(null)}>
-                        <div className="card animate-scaleIn" style={{
-                            width: "100%", maxWidth: 520, padding: "2rem",
-                            maxHeight: "80vh", overflowY: "auto"
-                        }} onClick={e => e.stopPropagation()}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                                <div>
-                                    <h3 style={{ fontSize: "1.2rem" }}>
-                                        <Handshake size={18} style={{ verticalAlign: -3, marginRight: 6 }} />
-                                        Collaborate on {collabModal.companyName}
-                                    </h3>
-                                    <p style={{ fontSize: "0.82rem", color: "var(--warm-gray)", marginTop: "0.2rem" }}>
-                                        Invite investors to co-invest and run their own assessment.
-                                    </p>
-                                </div>
-                                <button onClick={() => setCollabModal(null)} style={{
-                                    border: "none", background: "none", cursor: "pointer",
-                                    color: "var(--warm-gray)", padding: "0.25rem"
-                                }}><X size={20} /></button>
-                            </div>
-
-                            {(collabModal.collab.collaborators || []).length > 0 && (
-                                <div style={{ marginBottom: "1.5rem" }}>
-                                    <label>Invited Investors</label>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                        {collabModal.collab.collaborators.map((c, i) => (
-                                            <div key={i} style={{
-                                                display: "flex", justifyContent: "space-between", alignItems: "center",
-                                                padding: "0.5rem 0.75rem", borderRadius: "var(--radius-sm)",
-                                                background: "var(--bg-elevated)"
-                                            }}>
-                                                <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{c.investor_name}</span>
-                                                <span className={`badge ${c.status === "assessed" ? "badge--green" : "badge--yellow"}`}
-                                                    style={{ fontSize: "0.7rem" }}>{c.status}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <label>Invite New Investor</label>
-                            <div style={{ position: "relative", marginBottom: "0.75rem" }}>
-                                <Search size={14} style={{
-                                    position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
-                                    color: "var(--warm-gray)"
-                                }} />
-                                <input type="text" placeholder="Search investors…"
-                                    value={inviteSearch}
-                                    onChange={e => setInviteSearch(e.target.value)}
-                                    style={{ paddingLeft: "2rem", fontSize: "0.85rem" }}
-                                />
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: 200, overflowY: "auto" }}>
-                                {invitableInvestors.map(inv => (
-                                    <div key={inv._id} style={{
-                                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                                        padding: "0.65rem 0.85rem", borderRadius: "var(--radius-sm)",
-                                        border: "1px solid var(--light-border)", background: "var(--bg-card)"
-                                    }}>
-                                        <div>
-                                            <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{inv.name}</div>
-                                            <div style={{ fontSize: "0.72rem", color: "var(--warm-gray)" }}>
-                                                {inv.investor_type?.replace("_", " ")} • {(inv.sectors || []).slice(0, 3).join(", ")}
-                                            </div>
-                                        </div>
-                                        <button className="btn btn--accent" onClick={() => handleInvite(inv)}
-                                            disabled={inviting}
-                                            style={{ padding: "0.35rem 0.85rem", fontSize: "0.78rem" }}>
-                                            <UserPlus size={13} /> Invite
-                                        </button>
-                                    </div>
-                                ))}
-                                {invitableInvestors.length === 0 && (
-                                    <p style={{ textAlign: "center", color: "var(--warm-gray)", fontSize: "0.85rem", padding: "1rem" }}>
-                                        No available investors to invite.
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </main>
+            </div>
         </div>
     );
 }
 
-/* ─── Status Badge ────────────────────────────────────────────────────────── */
-function StatusBadge({ status }) {
+/* ─── App Card ─────────────────────────────────────────────────────────────── */
+function AppCard({ app, appStatus, hasResult, isAnalyzing, anyAnalyzing, onAnalyze, onViewResult, onAccept, onReject, onCollabAccept, onCollabReject }) {
+    const isDirect = !app.is_collab_invite;
+
+    // Determine what buttons to show
+    const canAssess = appStatus === "pending" || appStatus === "collab_pending";
+    const canReAssess = appStatus === "analyzed" || appStatus === "collab_assessed"; // already analyzed but can re-run
+    const hasDecided = ["ACCEPTED", "REJECTED", "COLLAB_ACCEPTED", "COLLAB_REJECTED"].includes(appStatus);
+    const canDirectDecide = isDirect && appStatus === "analyzed";
+    const canCollabDecide = !isDirect && appStatus === "collab_assessed";
+
+    return (
+        <div className="card" style={{ padding: "1.15rem 1.35rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.85rem" }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <div style={{
+                            width: 38, height: 38, borderRadius: "var(--radius-full)",
+                            background: "var(--sage-light)", display: "flex",
+                            alignItems: "center", justifyContent: "center",
+                            fontWeight: 700, fontSize: "0.88rem", color: "var(--forest)",
+                            border: "1px solid var(--sage-muted)", flexShrink: 0
+                        }}>
+                            {app.company_name?.charAt(0) || "?"}
+                        </div>
+                        <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <span style={{ fontWeight: 700, fontSize: "1rem" }}>{app.company_name}</span>
+                                {!isDirect && (
+                                    <span className="badge badge--copper" style={{ fontSize: "0.58rem", padding: "0.1rem 0.4rem" }}>
+                                        <Handshake size={9} /> Collab Invite
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ fontSize: "0.78rem", color: "var(--slate)" }}>
+                                by {app.entrepreneur_name}
+                                {!isDirect && app.collab_invited_by_name && (
+                                    <> • invited by <strong>{app.collab_invited_by_name}</strong></>
+                                )}
+                            </div>
+                            {app.linkedin_url && (
+                                <a href={app.linkedin_url} target="_blank" rel="noreferrer"
+                                    style={{ fontSize: "0.7rem", color: "var(--forest-lighter)", display: "flex", alignItems: "center", gap: "0.2rem", textDecoration: "none", marginTop: "0.1rem" }}>
+                                    <Linkedin size={10} /> LinkedIn
+                                </a>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <AppStatusBadge status={appStatus} />
+
+                    {/* Assess/Re-assess */}
+                    {(canAssess || (canReAssess && !isDirect)) && (
+                        <button className="btn btn--forest btn--sm" onClick={onAnalyze}
+                            disabled={anyAnalyzing || hasDecided}>
+                            <PlayCircle size={13} /> {canAssess ? "Assess" : "Re-Assess"}
+                        </button>
+                    )}
+
+                    {/* View report */}
+                    {hasResult && (
+                        <button className="btn btn--sm" onClick={onViewResult}>
+                            <Eye size={13} /> Report
+                        </button>
+                    )}
+
+                    {/* Direct app decision buttons */}
+                    {canDirectDecide && (
+                        <>
+                            <button className="btn btn--success btn--sm" onClick={onAccept}>
+                                <ThumbsUp size={13} /> Accept
+                            </button>
+                            <button className="btn btn--danger btn--sm" onClick={onReject}>
+                                <ThumbsDown size={13} /> Decline
+                            </button>
+                        </>
+                    )}
+
+                    {/* Collab decision buttons — only after assessed */}
+                    {canCollabDecide && (
+                        <>
+                            <button className="btn btn--success btn--sm" onClick={onCollabAccept}>
+                                <ThumbsUp size={13} /> Join Deal
+                            </button>
+                            <button className="btn btn--danger btn--sm" onClick={onCollabReject}>
+                                <ThumbsDown size={13} /> Decline
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Blocked message if collab invite and not yet assessed */}
+            {!isDirect && appStatus === "collab_pending" && (
+                <div style={{
+                    marginTop: "0.65rem", padding: "0.5rem 0.85rem",
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--warning-bg)", border: "1px solid var(--warning-border)",
+                    fontSize: "0.8rem", color: "var(--warning)"
+                }}>
+                    ⚠️ You must <strong>Assess</strong> this application before you can accept or decline the collaboration invite.
+                </div>
+            )}
+
+            {/* Message for decided collab */}
+            {(appStatus === "COLLAB_ACCEPTED" || appStatus === "COLLAB_REJECTED") && (
+                <div style={{
+                    marginTop: "0.65rem", padding: "0.5rem 0.85rem",
+                    borderRadius: "var(--radius-md)",
+                    background: appStatus === "COLLAB_ACCEPTED" ? "var(--success-bg)" : "var(--danger-bg)",
+                    border: `1px solid ${appStatus === "COLLAB_ACCEPTED" ? "var(--success-border)" : "var(--danger-border)"}`,
+                    fontSize: "0.8rem",
+                    color: appStatus === "COLLAB_ACCEPTED" ? "var(--success)" : "var(--danger)"
+                }}>
+                    {appStatus === "COLLAB_ACCEPTED" ? "✅ You have joined this deal." : "❌ You declined this collaboration."}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ─── Status Badge ─────────────────────────────────────────────────────────── */
+function AppStatusBadge({ status }) {
     switch (status) {
-        case "approved":
-            return <span className="badge badge--green"><ThumbsUp size={11} /> Approved</span>;
-        case "rejected":
-            return <span className="badge" style={{ background: "var(--danger-bg)", color: "var(--terracotta-dark)" }}><ThumbsDown size={11} /> Declined</span>;
+        case "ACCEPTED":
+            return <span className="badge badge--green"><ThumbsUp size={10} /> Accepted</span>;
+        case "REJECTED":
+            return <span className="badge" style={{ background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger-border)" }}><ThumbsDown size={10} /> Declined</span>;
         case "analyzed":
-            return <span className="badge badge--green"><CheckCircle size={12} /> Analyzed</span>;
+            return <span className="badge badge--green"><CheckCircle size={11} /> Analyzed</span>;
+        case "collab_assessed":
+            return <span className="badge badge--green"><CheckCircle size={11} /> Assessed</span>;
+        case "COLLAB_ACCEPTED":
+            return <span className="badge badge--green"><ThumbsUp size={10} /> Joined</span>;
+        case "COLLAB_REJECTED":
+            return <span className="badge" style={{ background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger-border)" }}><ThumbsDown size={10} /> Declined</span>;
+        case "collab_pending":
+            return <span className="badge badge--yellow"><Clock size={11} /> Invited</span>;
         default:
-            return <span className="badge badge--yellow"><Clock size={12} /> Pending</span>;
+            return <span className="badge badge--yellow"><Clock size={11} /> Pending</span>;
     }
 }
 
-/* ─── Stat Card ───────────────────────────────────────────────────────────── */
-function StatCard({ label, value, icon, bg }) {
+/* ─── Decision Modal ──────────────────────────────────────────────────────── */
+function DecisionModal({ decisionModal, setDecisionModal, decisionType, setDecisionType, decisionMsg, setDecisionMsg, decidingLoading, handleDecision }) {
     return (
-        <div className="card" style={{
-            padding: "1.25rem 1.5rem", display: "flex",
-            alignItems: "center", gap: "1rem", background: bg
-        }}>
-            <div style={{
-                width: 40, height: 40, borderRadius: "var(--radius-sm)",
-                background: "var(--bg-card)", display: "flex",
-                alignItems: "center", justifyContent: "center",
-                boxShadow: "var(--shadow-xs)"
-            }}>{icon}</div>
+        <div className="modal-overlay" onClick={() => { setDecisionModal(null); setDecisionType(null); }}>
+            <div className="modal-card" onClick={e => e.stopPropagation()}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+                    <h3 style={{ fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        {decisionType === "accepted"
+                            ? <><ThumbsUp size={18} color="var(--success)" /> Accept {decisionModal.companyName}</>
+                            : <><ThumbsDown size={18} color="var(--danger)" /> Decline {decisionModal.companyName}</>}
+                    </h3>
+                    <button onClick={() => { setDecisionModal(null); setDecisionType(null); }} style={{ border: "none", background: "none", cursor: "pointer", color: "var(--slate)", padding: "0.25rem" }}>
+                        <X size={20} />
+                    </button>
+                </div>
+                <label>Message to Entrepreneur</label>
+                <textarea value={decisionMsg} onChange={e => setDecisionMsg(e.target.value)} rows={4}
+                    style={{
+                        width: "100%", padding: "0.75rem", borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--sand)", fontFamily: "var(--font-body)",
+                        fontSize: "0.88rem", resize: "vertical", marginBottom: "1.25rem"
+                    }}
+                />
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.65rem" }}>
+                    <button className="btn" onClick={() => { setDecisionModal(null); setDecisionType(null); }}>Cancel</button>
+                    <button className={`btn ${decisionType === "accepted" ? "btn--forest" : "btn--danger"}`}
+                        onClick={handleDecision} disabled={decidingLoading}>
+                        {decidingLoading ? "Sending…" : decisionType === "accepted" ? "Confirm Acceptance" : "Confirm Decline"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ─── Stat Card ───────────────────────────────────────────────────────────── */
+function StatCard({ label, value, icon, bg, iconBg }) {
+    return (
+        <div className="stat-card" style={{ background: bg }}>
+            <div className="stat-card-icon" style={{ background: iconBg }}>{icon}</div>
             <div>
-                <div style={{ fontSize: "1.6rem", fontWeight: 700, fontFamily: "var(--font-display)", lineHeight: 1 }}>{value}</div>
-                <div style={{ fontSize: "0.72rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--warm-gray)" }}>{label}</div>
+                <div className="stat-card-value">{value}</div>
+                <div className="stat-card-label">{label}</div>
             </div>
         </div>
     );

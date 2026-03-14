@@ -18,7 +18,8 @@ SMTP_EMAIL = os.getenv("SMTP_EMAIL", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
 
-def _build_approved_html(company_name: str, message: str) -> str:
+def _build_approved_html(company_name: str, message: str, investor_name: str = "") -> str:
+    investor_display = investor_name if investor_name else "one of our investors"
     return f"""
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 2rem;">
         <div style="text-align: center; margin-bottom: 2rem;">
@@ -27,9 +28,11 @@ def _build_approved_html(company_name: str, message: str) -> str:
         </div>
         <div style="background: #f0faf0; border: 1px solid #c6e6c6; border-radius: 12px; padding: 2rem; text-align: center;">
             <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
-            <h2 style="color: #2d7d46; margin-bottom: 0.75rem;">Congratulations!</h2>
-            <p style="color: #333; font-size: 1.05rem; line-height: 1.6;">
-                Your application for <strong>{company_name}</strong> has been <strong style="color: #2d7d46;">approved</strong> by the investor.
+            <h2 style="color: #2d7d46; margin-bottom: 0.75rem;">Application Accepted!</h2>
+            <p style="color: #333; font-size: 1.05rem; line-height: 1.7;">
+                We're delighted to inform you that <strong>{company_name}</strong> has been <strong style="color: #2d7d46;">accepted</strong> by <strong>{investor_display}</strong> on the Cynt platform.
+                This decision reflects genuine interest in your startup's vision and potential.
+                Please review the message below and expect to be contacted shortly regarding next steps.
             </p>
             {f'<div style="margin-top: 1.5rem; padding: 1rem; background: #fff; border-radius: 8px; border: 1px solid #e0e0e0;"><p style="color: #555; font-size: 0.95rem; line-height: 1.6; margin: 0;">{message}</p></div>' if message else ''}
         </div>
@@ -40,7 +43,8 @@ def _build_approved_html(company_name: str, message: str) -> str:
     """
 
 
-def _build_declined_html(company_name: str, message: str) -> str:
+def _build_declined_html(company_name: str, message: str, investor_name: str = "") -> str:
+    investor_display = investor_name if investor_name else "our investment team"
     return f"""
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 2rem;">
         <div style="text-align: center; margin-bottom: 2rem;">
@@ -50,8 +54,10 @@ def _build_declined_html(company_name: str, message: str) -> str:
         <div style="background: #fef5f3; border: 1px solid #f0c6be; border-radius: 12px; padding: 2rem; text-align: center;">
             <div style="font-size: 3rem; margin-bottom: 0.5rem;">📋</div>
             <h2 style="color: #c1553b; margin-bottom: 0.75rem;">Application Update</h2>
-            <p style="color: #333; font-size: 1.05rem; line-height: 1.6;">
-                Your application for <strong>{company_name}</strong> was <strong style="color: #c1553b;">not approved</strong> at this time.
+            <p style="color: #333; font-size: 1.05rem; line-height: 1.7;">
+                After careful consideration, <strong>{investor_display}</strong> has decided not to move forward with <strong>{company_name}</strong> at this time.
+                We appreciate the effort you put into your application and encourage you to keep building — great startups take time.
+                Please review the message below for specific feedback from the investor.
             </p>
             {f'<div style="margin-top: 1.5rem; padding: 1rem; background: #fff; border-radius: 8px; border: 1px solid #e0e0e0;"><p style="color: #555; font-size: 0.95rem; line-height: 1.6; margin: 0;">{message}</p></div>' if message else ''}
         </div>
@@ -67,6 +73,7 @@ def send_decision_email(
     company_name: str,
     decision: str,
     message: str = "",
+    investor_name: str = "",
 ) -> bool:
     """Send a verdict email to the entrepreneur.
 
@@ -75,6 +82,7 @@ def send_decision_email(
         company_name: Name of the startup.
         decision: "approved" or "rejected".
         message: Optional investor message.
+        investor_name: Name of the investor who made the decision.
 
     Returns:
         True if sent successfully, False otherwise.
@@ -91,9 +99,9 @@ def send_decision_email(
         )
 
         html_body = (
-            _build_approved_html(company_name, message)
+            _build_approved_html(company_name, message, investor_name)
             if decision == "approved"
-            else _build_declined_html(company_name, message)
+            else _build_declined_html(company_name, message, investor_name)
         )
 
         msg = MIMEMultipart("alternative")

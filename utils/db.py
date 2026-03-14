@@ -38,6 +38,10 @@ def get_collaborations_collection():
     return get_db()["collaborations"]
 
 
+def get_collaboration_invites_collection():
+    return get_db()["collaboration_invites"]
+
+
 def get_indicator_collection():
     """Return the 'indicator' collection in the data DB (same one used by scraper.py / linkedin_fetcher.py)."""
     global _client

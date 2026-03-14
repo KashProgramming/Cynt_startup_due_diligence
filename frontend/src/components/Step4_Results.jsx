@@ -33,10 +33,10 @@ const RISKS_EXPLANATION = "Key risks are the most critical factors that could ca
 
 const MILESTONES_EXPLANATION = "Required milestones are specific achievements the startup should reach before or shortly after investment. They serve as checkpoints and may be tied to tranche releases or follow-on investment decisions.";
 
-// ─── Chart color palette ────────────────────────────────────────────────────
+// ─── Chart color palette — Forest theme ─────────────────────────────────────
 
-const CHART_COLORS = ["#c1553b", "#6b7f3b", "#d4a843", "#8B6F47", "#5a7d7c"];
-const RADAR_COLOR = "#c1553b";
+const CHART_COLORS = ["#1B4332", "#2D6A4F", "#B07D62", "#40916C", "#5C4033"];
+const RADAR_COLOR = "#1B4332";
 
 export default function Step4_Results({ result, onReset }) {
     const memoRef = useRef(null);
@@ -79,7 +79,7 @@ export default function Step4_Results({ result, onReset }) {
     else if (d.final_decision === "PASS" || d.final_decision === "REJECT") badgeClass = "badge--red";
 
     // Score color
-    const scoreColor = d.decision_score >= 70 ? "var(--olive)" : d.decision_score >= 40 ? "var(--gold)" : "var(--terracotta)";
+    const scoreColor = d.decision_score >= 70 ? "var(--forest-lighter)" : d.decision_score >= 40 ? "var(--warning)" : "var(--danger)";
 
     // ─── Chart data ────────────────────────────────────────────────────────
     const radarData = [
@@ -106,38 +106,38 @@ export default function Step4_Results({ result, onReset }) {
         <div className="animate-fadeUp">
             {/* Hero Decision Card */}
             <div className="card" style={{
-                marginBottom: "2rem", padding: "2.5rem",
+                marginBottom: "1.5rem", padding: "2.25rem",
                 textAlign: "center", position: "relative",
                 overflow: "hidden"
             }}>
-                {/* Decorative corner shapes */}
+                {/* Decorative shapes */}
                 <div style={{
-                    position: "absolute", top: -20, right: -20,
-                    width: 80, height: 80, borderRadius: "50%",
-                    background: `${scoreColor}15`, pointerEvents: "none"
+                    position: "absolute", top: -30, right: -30,
+                    width: 100, height: 100, borderRadius: "50%",
+                    background: `${scoreColor}10`, pointerEvents: "none"
                 }} />
                 <div style={{
-                    position: "absolute", bottom: -30, left: -30,
-                    width: 100, height: 100, borderRadius: "50%",
-                    background: "var(--bg-elevated)", pointerEvents: "none"
+                    position: "absolute", bottom: -40, left: -40,
+                    width: 120, height: 120, borderRadius: "50%",
+                    background: "var(--cream-dark)", pointerEvents: "none"
                 }} />
 
                 {/* Decision Badge */}
-                <div style={{ marginBottom: "1.5rem" }}>
+                <div style={{ marginBottom: "1.25rem" }}>
                     <span className={`badge ${badgeClass}`} style={{
-                        fontSize: "0.85rem", padding: "0.4rem 1.25rem",
-                        letterSpacing: "0.08em"
+                        fontSize: "0.82rem", padding: "0.35rem 1.15rem",
+                        letterSpacing: "0.06em"
                     }}>
                         {decisionLabel}
                     </span>
                 </div>
 
                 {/* Score Gauge */}
-                <div style={{ position: "relative", width: 150, height: 150, margin: "0 auto 1.5rem" }}>
+                <div style={{ position: "relative", width: 140, height: 140, margin: "0 auto 1.25rem" }}>
                     <svg viewBox="0 0 150 150" style={{ transform: "rotate(-90deg)" }}>
-                        <circle cx="75" cy="75" r="62" fill="none" stroke="var(--light-border)" strokeWidth="8" />
+                        <circle cx="75" cy="75" r="62" fill="none" stroke="var(--sand)" strokeWidth="7" />
                         <circle cx="75" cy="75" r="62" fill="none"
-                            stroke={scoreColor} strokeWidth="8"
+                            stroke={scoreColor} strokeWidth="7"
                             strokeLinecap="round"
                             strokeDasharray={`${2 * Math.PI * 62}`}
                             strokeDashoffset={`${2 * Math.PI * 62 * (1 - d.decision_score / 100)}`}
@@ -149,16 +149,16 @@ export default function Step4_Results({ result, onReset }) {
                         transform: "translate(-50%, -50%)", textAlign: "center"
                     }}>
                         <div style={{
-                            fontSize: "2.8rem", fontWeight: 700,
-                            fontFamily: "var(--font-display)",
+                            fontSize: "2.5rem", fontWeight: 700,
+                            fontFamily: "var(--font-heading)",
                             color: scoreColor, lineHeight: 1
                         }}>
                             {d.decision_score}
                         </div>
                         <div style={{
-                            fontSize: "0.65rem", fontWeight: 700,
+                            fontSize: "0.62rem", fontWeight: 700,
                             textTransform: "uppercase", letterSpacing: "0.1em",
-                            color: "var(--warm-gray)", marginTop: "0.2rem"
+                            color: "var(--slate)", marginTop: "0.2rem"
                         }}>Score</div>
                     </div>
                 </div>
@@ -176,12 +176,12 @@ export default function Step4_Results({ result, onReset }) {
                     ].map((item) => (
                         <div key={item.label} style={{ textAlign: "center" }}>
                             <div style={{
-                                fontSize: "0.65rem", fontWeight: 700,
-                                textTransform: "uppercase", letterSpacing: "0.1em",
-                                color: "var(--warm-gray)", marginBottom: "0.2rem"
+                                fontSize: "0.62rem", fontWeight: 700,
+                                textTransform: "uppercase", letterSpacing: "0.08em",
+                                color: "var(--slate)", marginBottom: "0.15rem"
                             }}>{item.label}</div>
                             <div style={{
-                                fontSize: "1rem", fontWeight: 600,
+                                fontSize: "0.95rem", fontWeight: 600,
                                 color: "var(--charcoal)"
                             }}>{item.value}</div>
                         </div>
@@ -189,36 +189,32 @@ export default function Step4_Results({ result, onReset }) {
                 </div>
             </div>
 
-            {/* ═══ Radar Chart — Overall Assessment ═══ */}
-            <div className="card" style={{ padding: "1.75rem", marginBottom: "1.5rem" }}>
-                <div style={{
-                    display: "flex", alignItems: "center", gap: "0.6rem",
-                    marginBottom: "1rem"
-                }}>
-                    <div style={{
-                        width: 32, height: 32, borderRadius: "var(--radius-sm)",
-                        background: "var(--bg-elevated)", display: "flex",
-                        alignItems: "center", justifyContent: "center"
-                    }}>
-                        <Activity size={16} color="var(--charcoal)" />
-                    </div>
-                    <h3 style={{ fontSize: "1.1rem" }}>Overall Assessment Radar</h3>
-                </div>
-                <div style={{ width: "100%", height: 300 }}>
+            {/* ═══ Radar Chart ═══ */}
+            <div className="card" style={{ padding: "1.5rem", marginBottom: "1.25rem" }}>
+                <SectionHeader
+                    icon={<Activity size={16} color="var(--forest)" />}
+                    iconBg="var(--sage-light)"
+                    title="Overall Assessment Radar"
+                    sectionKey="radar_info"
+                    expanded={false}
+                    onToggle={() => { }}
+                    showToggle={false}
+                />
+                <div style={{ width: "100%", height: 280 }}>
                     <ResponsiveContainer>
                         <RadarChart data={radarData} outerRadius="75%">
-                            <PolarGrid stroke="var(--light-border)" />
+                            <PolarGrid stroke="var(--sand)" />
                             <PolarAngleAxis
                                 dataKey="subject"
-                                tick={{ fill: "var(--warm-gray)", fontSize: 12, fontFamily: "var(--font-body)" }}
+                                tick={{ fill: "var(--slate)", fontSize: 12, fontFamily: "var(--font-body)" }}
                             />
                             <PolarRadiusAxis
                                 angle={90} domain={[0, 100]}
-                                tick={{ fill: "var(--warm-gray)", fontSize: 10 }}
+                                tick={{ fill: "var(--slate)", fontSize: 10 }}
                             />
                             <Radar
                                 name="Score" dataKey="value"
-                                stroke={RADAR_COLOR} fill={RADAR_COLOR} fillOpacity={0.2}
+                                stroke={RADAR_COLOR} fill={RADAR_COLOR} fillOpacity={0.15}
                                 strokeWidth={2}
                             />
                         </RadarChart>
@@ -229,13 +225,13 @@ export default function Step4_Results({ result, onReset }) {
             {/* Metrics Grid */}
             <div style={{
                 display: "grid", gridTemplateColumns: "1fr 1fr",
-                gap: "1.5rem", marginBottom: "1.5rem"
+                gap: "1.25rem", marginBottom: "1.25rem"
             }}>
                 {/* Financial Card */}
-                <div className="card" style={{ padding: "1.75rem" }}>
+                <div className="card" style={{ padding: "1.5rem" }}>
                     <SectionHeader
-                        icon={<BarChart3 size={16} color="var(--terracotta)" />}
-                        iconBg="var(--terracotta-light)"
+                        icon={<BarChart3 size={16} color="var(--copper)" />}
+                        iconBg="#FDF2E9"
                         title="Financial Profile"
                         sectionKey="financial"
                         expanded={expandedSections.financial}
@@ -246,13 +242,13 @@ export default function Step4_Results({ result, onReset }) {
                         <ExplanationPanel explanations={FINANCIAL_EXPLANATIONS} />
                     )}
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                         <MetricRow label="Runway" value={fmtFallback(sim.runway_months, " mo")} />
                         <MetricRow label="Burn Multiple" value={fmtFallback(sim.burn_multiple, "x")} />
                         <MetricRow label="Bankruptcy Proj." value={fmtFallback(sim.bankruptcy_projection_months, " mo")} />
                         <MetricRow label="Capital Efficiency" value={sim.capital_efficiency_ratio} />
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>Valuation Flag</span>
+                            <span style={{ color: "var(--slate)", fontSize: "0.88rem" }}>Valuation Flag</span>
                             <span className={`badge ${fr.valuation_realism_flag ? "badge--red" : "badge--green"}`}>
                                 {fr.valuation_realism_flag ? "⚠ Flagged" : "✓ OK"}
                             </span>
@@ -260,23 +256,23 @@ export default function Step4_Results({ result, onReset }) {
                     </div>
 
                     {/* Financial Bar Chart */}
-                    <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid var(--light-border)" }}>
-                        <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--warm-gray)", marginBottom: "0.5rem" }}>
+                    <div style={{ marginTop: "1.25rem", paddingTop: "0.85rem", borderTop: "1px solid var(--sand)" }}>
+                        <div style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--slate)", marginBottom: "0.5rem" }}>
                             vs Benchmarks
                         </div>
                         <div style={{ width: "100%", height: 160 }}>
                             <ResponsiveContainer>
                                 <BarChart data={financialBarData} layout="vertical" margin={{ left: 10, right: 10 }}>
-                                    <XAxis type="number" tick={{ fontSize: 10, fill: "var(--warm-gray)" }} />
+                                    <XAxis type="number" tick={{ fontSize: 10, fill: "var(--slate)" }} />
                                     <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fill: "var(--charcoal)" }} />
                                     <Tooltip
                                         contentStyle={{
-                                            background: "var(--bg-card)", border: "1px solid var(--light-border)",
+                                            background: "var(--white)", border: "1px solid var(--sand)",
                                             borderRadius: "8px", fontSize: "0.82rem", fontFamily: "var(--font-body)"
                                         }}
                                     />
                                     <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} name="Actual" />
-                                    <Bar dataKey="benchmark" fill="var(--light-border)" radius={[0, 4, 4, 0]} name="Benchmark" />
+                                    <Bar dataKey="benchmark" fill="var(--sand)" radius={[0, 4, 4, 0]} name="Benchmark" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -284,10 +280,10 @@ export default function Step4_Results({ result, onReset }) {
                 </div>
 
                 {/* Market & Founder Card */}
-                <div className="card" style={{ padding: "1.75rem" }}>
+                <div className="card" style={{ padding: "1.5rem" }}>
                     <SectionHeader
-                        icon={<Target size={16} color="var(--olive)" />}
-                        iconBg="var(--olive-light)"
+                        icon={<Target size={16} color="var(--forest)" />}
+                        iconBg="var(--sage-light)"
                         title="Market & Founder"
                         sectionKey="market"
                         expanded={expandedSections.market}
@@ -298,16 +294,16 @@ export default function Step4_Results({ result, onReset }) {
                         <ExplanationPanel explanations={MARKET_FOUNDER_EXPLANATIONS} />
                     )}
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                         <MetricRow label="Market Momentum" value={`${mv.market_momentum_score}/100`} />
                         <MetricRow label="Hype vs Evidence" value={mv.hype_vs_evidence_delta} />
                         <MetricRow label="Competitive Saturation" value={`${mv.competitive_saturation_score}/100`} />
                         <div style={{
                             display: "flex", justifyContent: "space-between",
-                            alignItems: "center", marginTop: "0.5rem",
-                            paddingTop: "0.5rem", borderTop: "1px solid var(--light-border)"
+                            alignItems: "center", marginTop: "0.4rem",
+                            paddingTop: "0.4rem", borderTop: "1px solid var(--sand)"
                         }}>
-                            <span style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>Founder Risk</span>
+                            <span style={{ color: "var(--slate)", fontSize: "0.88rem" }}>Founder Risk</span>
                             <span className={`badge ${fi.risk_level === "HIGH" ? "badge--red" : fi.risk_level === "MEDIUM" ? "badge--yellow" : "badge--green"}`}>
                                 {fi.risk_level}
                             </span>
@@ -316,8 +312,8 @@ export default function Step4_Results({ result, onReset }) {
                     </div>
 
                     {/* Founder Pie Chart */}
-                    <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid var(--light-border)" }}>
-                        <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--warm-gray)", marginBottom: "0.5rem" }}>
+                    <div style={{ marginTop: "1.25rem", paddingTop: "0.85rem", borderTop: "1px solid var(--sand)" }}>
+                        <div style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--slate)", marginBottom: "0.5rem" }}>
                             Founder Score Breakdown
                         </div>
                         <div style={{ width: "100%", height: 200 }}>
@@ -335,7 +331,7 @@ export default function Step4_Results({ result, onReset }) {
                                     </Pie>
                                     <Tooltip
                                         contentStyle={{
-                                            background: "var(--bg-card)", border: "1px solid var(--light-border)",
+                                            background: "var(--white)", border: "1px solid var(--sand)",
                                             borderRadius: "8px", fontSize: "0.82rem"
                                         }}
                                     />
@@ -352,11 +348,11 @@ export default function Step4_Results({ result, onReset }) {
             {/* Risks & Milestones */}
             <div style={{
                 display: "grid", gridTemplateColumns: "1fr 1fr",
-                gap: "1.5rem", marginBottom: "2rem"
+                gap: "1.25rem", marginBottom: "1.75rem"
             }}>
-                <div className="card" style={{ padding: "1.75rem" }}>
+                <div className="card" style={{ padding: "1.5rem" }}>
                     <SectionHeader
-                        icon={<AlertTriangle size={16} color="var(--terracotta)" />}
+                        icon={<AlertTriangle size={16} color="var(--danger)" />}
                         iconBg="var(--danger-bg)"
                         title="Key Risks"
                         sectionKey="risks"
@@ -367,8 +363,8 @@ export default function Step4_Results({ result, onReset }) {
                     {expandedSections.risks && (
                         <div style={{
                             padding: "0.75rem 1rem", marginBottom: "0.75rem",
-                            background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)",
-                            fontSize: "0.82rem", color: "var(--warm-gray)", lineHeight: 1.6
+                            background: "var(--cream-dark)", borderRadius: "var(--radius-md)",
+                            fontSize: "0.8rem", color: "var(--slate)", lineHeight: 1.6
                         }}>
                             {RISKS_EXPLANATION}
                         </div>
@@ -376,20 +372,20 @@ export default function Step4_Results({ result, onReset }) {
 
                     <ul style={{
                         paddingLeft: "1.25rem", display: "flex",
-                        flexDirection: "column", gap: "0.4rem"
+                        flexDirection: "column", gap: "0.35rem"
                     }}>
                         {d.key_risks?.length
                             ? d.key_risks.map((r, i) => (
-                                <li key={i} style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>{r}</li>
+                                <li key={i} style={{ color: "var(--slate)", fontSize: "0.88rem" }}>{r}</li>
                             ))
-                            : <li style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>No major risks identified.</li>
+                            : <li style={{ color: "var(--slate)", fontSize: "0.88rem" }}>No major risks identified.</li>
                         }
                     </ul>
                 </div>
 
-                <div className="card" style={{ padding: "1.75rem" }}>
+                <div className="card" style={{ padding: "1.5rem" }}>
                     <SectionHeader
-                        icon={<CheckCircle size={16} color="var(--olive)" />}
+                        icon={<CheckCircle size={16} color="var(--success)" />}
                         iconBg="var(--success-bg)"
                         title="Required Milestones"
                         sectionKey="milestones"
@@ -400,8 +396,8 @@ export default function Step4_Results({ result, onReset }) {
                     {expandedSections.milestones && (
                         <div style={{
                             padding: "0.75rem 1rem", marginBottom: "0.75rem",
-                            background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)",
-                            fontSize: "0.82rem", color: "var(--warm-gray)", lineHeight: 1.6
+                            background: "var(--cream-dark)", borderRadius: "var(--radius-md)",
+                            fontSize: "0.8rem", color: "var(--slate)", lineHeight: 1.6
                         }}>
                             {MILESTONES_EXPLANATION}
                         </div>
@@ -409,44 +405,44 @@ export default function Step4_Results({ result, onReset }) {
 
                     <ul style={{
                         paddingLeft: "1.25rem", display: "flex",
-                        flexDirection: "column", gap: "0.4rem"
+                        flexDirection: "column", gap: "0.35rem"
                     }}>
                         {d.required_milestones?.length
                             ? d.required_milestones.map((m, i) => (
-                                <li key={i} style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>{m}</li>
+                                <li key={i} style={{ color: "var(--slate)", fontSize: "0.88rem" }}>{m}</li>
                             ))
-                            : <li style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>No specific milestones.</li>
+                            : <li style={{ color: "var(--slate)", fontSize: "0.88rem" }}>No specific milestones.</li>
                         }
                     </ul>
                 </div>
             </div>
 
             {/* Investment Memo */}
-            <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: "2.5rem" }}>
+            <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: "2rem" }}>
                 <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "1.25rem 1.75rem",
-                    background: "var(--bg-elevated)",
-                    borderBottom: "1px solid var(--light-border)"
+                    padding: "1.1rem 1.5rem",
+                    background: "var(--cream-dark)",
+                    borderBottom: "1px solid var(--sand)"
                 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        <FileText size={20} color="var(--charcoal)" />
-                        <h3 style={{ fontSize: "1.2rem" }}>Investment Memo</h3>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <FileText size={18} color="var(--charcoal)" />
+                        <h3 style={{ fontSize: "1.1rem" }}>Investment Memo</h3>
                     </div>
-                    <button className="btn btn--accent" onClick={downloadPDF} style={{ padding: "0.5rem 1.25rem", fontSize: "0.85rem" }}>
-                        <Download size={15} /> Download PDF
+                    <button className="btn btn--forest btn--sm" onClick={downloadPDF}>
+                        <Download size={14} /> Download PDF
                     </button>
                 </div>
-                <div style={{ padding: "1.75rem" }}>
+                <div style={{ padding: "1.5rem" }}>
                     <div ref={memoRef} style={{
-                        background: "var(--bg-input)", padding: "1.5rem",
-                        borderRadius: "var(--radius-sm)",
-                        border: "1px solid var(--light-border)"
+                        background: "var(--white)", padding: "1.5rem",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--sand)"
                     }}>
                         <pre style={{
                             whiteSpace: "pre-wrap",
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontSize: "0.9rem",
+                            fontFamily: "var(--font-body)",
+                            fontSize: "0.88rem",
                             color: "var(--charcoal)",
                             lineHeight: 1.75
                         }}>
@@ -458,9 +454,7 @@ export default function Step4_Results({ result, onReset }) {
 
             {/* Reset */}
             <div style={{ display: "flex", justifyContent: "center" }}>
-                <button className="btn" onClick={onReset} style={{
-                    padding: "0.85rem 2.5rem", fontSize: "1rem"
-                }}>
+                <button className="btn btn--lg" onClick={onReset}>
                     <RefreshCw size={18} /> Start New Analysis
                 </button>
             </div>
@@ -469,37 +463,39 @@ export default function Step4_Results({ result, onReset }) {
 }
 
 /* ─── Section Header with Info Toggle ─────────────────────────────────────── */
-function SectionHeader({ icon, iconBg, title, sectionKey, expanded, onToggle }) {
+function SectionHeader({ icon, iconBg, title, sectionKey, expanded, onToggle, showToggle = true }) {
     return (
         <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
-            marginBottom: "1.25rem", paddingBottom: "0.75rem",
-            borderBottom: "1px solid var(--light-border)"
+            marginBottom: "1.15rem", paddingBottom: "0.65rem",
+            borderBottom: "1px solid var(--sand)"
         }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <div style={{
-                    width: 32, height: 32, borderRadius: "var(--radius-sm)",
+                    width: 30, height: 30, borderRadius: "var(--radius-sm)",
                     background: iconBg, display: "flex",
                     alignItems: "center", justifyContent: "center"
                 }}>
                     {icon}
                 </div>
-                <h3 style={{ fontSize: "1.1rem" }}>{title}</h3>
+                <h3 style={{ fontSize: "1.05rem" }}>{title}</h3>
             </div>
-            <button
-                onClick={() => onToggle(sectionKey)}
-                style={{
-                    border: "none", background: expanded ? "var(--bg-elevated)" : "transparent",
-                    cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem",
-                    padding: "0.3rem 0.65rem", borderRadius: "var(--radius-full)",
-                    color: "var(--warm-gray)", fontSize: "0.72rem", fontWeight: 600,
-                    fontFamily: "var(--font-body)", transition: "all 0.2s ease"
-                }}
-            >
-                <Info size={12} />
-                {expanded ? "Hide" : "What do these mean?"}
-                {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
+            {showToggle && (
+                <button
+                    onClick={() => onToggle(sectionKey)}
+                    style={{
+                        border: "none", background: expanded ? "var(--cream-dark)" : "transparent",
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: "0.25rem",
+                        padding: "0.25rem 0.6rem", borderRadius: "var(--radius-full)",
+                        color: "var(--slate)", fontSize: "0.7rem", fontWeight: 600,
+                        fontFamily: "var(--font-body)", transition: "all 0.2s ease"
+                    }}
+                >
+                    <Info size={11} />
+                    {expanded ? "Hide" : "What do these mean?"}
+                    {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                </button>
+            )}
         </div>
     );
 }
@@ -508,19 +504,20 @@ function SectionHeader({ icon, iconBg, title, sectionKey, expanded, onToggle }) 
 function ExplanationPanel({ explanations }) {
     return (
         <div style={{
-            marginBottom: "1rem", padding: "1rem",
-            background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)",
-            display: "flex", flexDirection: "column", gap: "0.75rem"
+            marginBottom: "0.85rem", padding: "1rem",
+            background: "var(--cream-dark)", borderRadius: "var(--radius-md)",
+            display: "flex", flexDirection: "column", gap: "0.65rem",
+            border: "1px solid var(--sand)"
         }}>
             {explanations.map((item, i) => (
                 <div key={i}>
-                    <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--charcoal)", marginBottom: "0.15rem" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.8rem", color: "var(--charcoal)", marginBottom: "0.1rem" }}>
                         {item.metric}
                     </div>
-                    <div style={{ fontSize: "0.78rem", color: "var(--warm-gray)", lineHeight: 1.5 }}>
+                    <div style={{ fontSize: "0.76rem", color: "var(--slate)", lineHeight: 1.5 }}>
                         <strong>What it is:</strong> {item.meaning}
                     </div>
-                    <div style={{ fontSize: "0.78rem", color: "var(--warm-gray)", lineHeight: 1.5 }}>
+                    <div style={{ fontSize: "0.76rem", color: "var(--slate)", lineHeight: 1.5 }}>
                         <strong>How to read:</strong> {item.interpretation}
                     </div>
                 </div>
@@ -533,8 +530,8 @@ function ExplanationPanel({ explanations }) {
 function MetricRow({ label, value }) {
     return (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>{label}</span>
-            <strong style={{ fontSize: "0.95rem", fontFamily: "var(--font-body)", color: "var(--charcoal)" }}>{value}</strong>
+            <span style={{ color: "var(--slate)", fontSize: "0.88rem" }}>{label}</span>
+            <strong style={{ fontSize: "0.92rem", fontFamily: "var(--font-body)", color: "var(--charcoal)" }}>{value}</strong>
         </div>
     );
 }

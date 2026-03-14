@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Activity, LogIn, UserPlus, Mail, Lock, User, Briefcase, ChevronRight } from "lucide-react";
+import { LogIn, UserPlus, Mail, Lock, User, Briefcase, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { api } from "../api";
 
 export default function LoginPage({ onLogin, apiOnline }) {
     const [mode, setMode] = useState("login"); // "login" | "register"
     const [role, setRole] = useState("entrepreneur");
     const [form, setForm] = useState({ email: "", password: "", name: "" });
+    const [showPassword, setShowPassword] = useState(false);
     const [investorFields, setInvestorFields] = useState({
         investor_type: "EARLY_VC",
         sectors: "fintech, saas",
@@ -55,46 +56,118 @@ export default function LoginPage({ onLogin, apiOnline }) {
 
     return (
         <div style={{
-            minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-            background: "var(--bg-canvas)",
-            backgroundImage: "radial-gradient(circle, var(--light-border) 1px, transparent 1px)",
-            backgroundSize: "24px 24px"
+            minHeight: "100vh", display: "flex",
+            background: "var(--cream)"
         }}>
-            <div className="animate-fadeUp" style={{ width: "100%", maxWidth: 480, padding: "2rem" }}>
-                {/* Logo */}
-                <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
-                    <img src="/cynt-logo.png" alt="Cynt" style={{
-                        width: 56, height: 56, borderRadius: "var(--radius-md)",
-                        boxShadow: "var(--shadow-md)", marginBottom: "1rem",
-                        objectFit: "contain"
-                    }} />
-                    <h1 style={{ fontSize: "1.8rem", marginBottom: "0.3rem" }}>Cynt</h1>
-                    <p style={{ color: "var(--warm-gray)", fontSize: "0.9rem" }}>AI-Powered Investment Intelligence</p>
-                </div>
+            {/* Left Branded Panel */}
+            <div style={{
+                width: "45%", minHeight: "100vh",
+                background: "var(--forest)",
+                display: "flex", flexDirection: "column",
+                justifyContent: "center", alignItems: "center",
+                padding: "3rem",
+                position: "relative", overflow: "hidden"
+            }}>
+                {/* Decorative elements */}
+                <div style={{
+                    position: "absolute", top: -80, right: -80,
+                    width: 260, height: 260, borderRadius: "50%",
+                    background: "rgba(149, 213, 178, 0.06)",
+                    pointerEvents: "none"
+                }} />
+                <div style={{
+                    position: "absolute", bottom: -100, left: -60,
+                    width: 320, height: 320, borderRadius: "50%",
+                    background: "rgba(149, 213, 178, 0.04)",
+                    pointerEvents: "none"
+                }} />
+                <div style={{
+                    position: "absolute", top: "30%", left: "10%",
+                    width: 120, height: 120, borderRadius: "50%",
+                    border: "1px solid rgba(149, 213, 178, 0.08)",
+                    pointerEvents: "none"
+                }} />
 
-                {/* Card */}
-                <div className="card" style={{ padding: "2rem" }}>
-                    {/* Tab Toggle */}
+                <div style={{ position: "relative", zIndex: 1, textAlign: "center", maxWidth: 380 }}>
+                    <img src="/cynt-logo.png" alt="Cynt" style={{
+                        width: 64, height: 64, borderRadius: "var(--radius-lg)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+                        marginBottom: "1.75rem", objectFit: "contain"
+                    }} />
+
+                    <h1 style={{
+                        fontFamily: "var(--font-heading)", fontSize: "2.5rem",
+                        color: "#fff", fontWeight: 700, marginBottom: "0.75rem",
+                        lineHeight: 1.1
+                    }}>Cynt</h1>
+
+                    <p style={{
+                        color: "var(--sage)", fontSize: "1.05rem",
+                        lineHeight: 1.6, marginBottom: "2.5rem", opacity: 0.9
+                    }}>
+                        AI-Powered Investment Intelligence for smarter due diligence decisions
+                    </p>
+
+                    {/* Feature bullets */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", textAlign: "left" }}>
+                        {[
+                            "Automated startup analysis & scoring",
+                            "Financial risk simulation engine",
+                            "Real-time market validation signals",
+                            "Collaborative investor assessment"
+                        ].map((feat, i) => (
+                            <div key={i} style={{
+                                display: "flex", alignItems: "center", gap: "0.75rem",
+                                color: "rgba(255,255,255,0.75)", fontSize: "0.88rem"
+                            }}>
+                                <div style={{
+                                    width: 6, height: 6, borderRadius: "50%",
+                                    background: "var(--sage)", flexShrink: 0
+                                }} />
+                                {feat}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Form Panel */}
+            <div style={{
+                flex: 1, display: "flex", alignItems: "center",
+                justifyContent: "center", padding: "2rem"
+            }}>
+                <div className="animate-fadeUp" style={{ width: "100%", maxWidth: 440 }}>
+                    {/* Mode Toggle */}
                     <div style={{
-                        display: "flex", background: "var(--bg-elevated)",
-                        borderRadius: "var(--radius-full)", padding: "4px",
-                        marginBottom: "1.75rem"
+                        display: "flex", background: "var(--cream-dark)",
+                        borderRadius: "var(--radius-md)", padding: "3px",
+                        marginBottom: "2rem", border: "1px solid var(--sand)"
                     }}>
                         {["login", "register"].map((m) => (
                             <button key={m} onClick={() => { setMode(m); setError(""); }}
                                 style={{
-                                    flex: 1, padding: "0.55rem", border: "none",
-                                    borderRadius: "var(--radius-full)", cursor: "pointer",
+                                    flex: 1, padding: "0.6rem", border: "none",
+                                    borderRadius: "var(--radius-sm)", cursor: "pointer",
                                     fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 600,
-                                    background: mode === m ? "var(--bg-card)" : "transparent",
-                                    color: mode === m ? "var(--charcoal)" : "var(--warm-gray)",
+                                    background: mode === m ? "var(--white)" : "transparent",
+                                    color: mode === m ? "var(--charcoal)" : "var(--slate)",
                                     boxShadow: mode === m ? "var(--shadow-sm)" : "none",
                                     transition: "all 0.2s ease",
-                                    textTransform: "capitalize"
+                                    display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem"
                                 }}>
-                                {m === "login" ? <><LogIn size={14} style={{ verticalAlign: -2, marginRight: 4 }} />Sign In</> : <><UserPlus size={14} style={{ verticalAlign: -2, marginRight: 4 }} />Register</>}
+                                {m === "login" ? <><LogIn size={14} /> Sign In</> : <><UserPlus size={14} /> Register</>}
                             </button>
                         ))}
+                    </div>
+
+                    {/* Welcome text */}
+                    <div style={{ marginBottom: "1.75rem" }}>
+                        <h2 style={{ fontSize: "1.6rem", marginBottom: "0.35rem" }}>
+                            {mode === "login" ? "Welcome back" : "Create your account"}
+                        </h2>
+                        <p style={{ color: "var(--slate)", fontSize: "0.9rem" }}>
+                            {mode === "login" ? "Sign in to access your dashboard" : "Join the platform as an entrepreneur or investor"}
+                        </p>
                     </div>
 
                     <form onSubmit={handleSubmit}>
@@ -107,12 +180,12 @@ export default function LoginPage({ onLogin, apiOnline }) {
                                         <button key={r} type="button" onClick={() => setRole(r)}
                                             style={{
                                                 flex: 1, padding: "0.65rem",
-                                                border: `2px solid ${role === r ? "var(--terracotta)" : "var(--light-border)"}`,
-                                                borderRadius: "var(--radius-sm)",
-                                                background: role === r ? "var(--terracotta-light)" : "var(--bg-card)",
-                                                color: role === r ? "var(--terracotta-dark)" : "var(--warm-gray)",
+                                                border: `2px solid ${role === r ? "var(--forest)" : "var(--sand)"}`,
+                                                borderRadius: "var(--radius-md)",
+                                                background: role === r ? "var(--sage-light)" : "var(--white)",
+                                                color: role === r ? "var(--forest)" : "var(--slate)",
                                                 cursor: "pointer", fontFamily: "var(--font-body)",
-                                                fontSize: "0.9rem", fontWeight: 600,
+                                                fontSize: "0.88rem", fontWeight: 600,
                                                 transition: "all 0.2s ease",
                                                 textTransform: "capitalize", display: "flex",
                                                 alignItems: "center", justifyContent: "center", gap: "0.4rem"
@@ -147,21 +220,35 @@ export default function LoginPage({ onLogin, apiOnline }) {
 
                         <div style={{ marginBottom: "1.25rem" }}>
                             <label>Password</label>
-                            <input type="password" placeholder="••••••••"
-                                value={form.password}
-                                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                                required
-                            />
+                            <div style={{ position: "relative" }}>
+                                <input type={showPassword ? "text" : "password"} placeholder="••••••••"
+                                    value={form.password}
+                                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                    required
+                                    style={{ paddingRight: "2.5rem" }}
+                                />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                                    style={{
+                                        position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                                        border: "none", background: "none", cursor: "pointer",
+                                        color: "var(--slate)", padding: "0.2rem"
+                                    }}>
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Investor-specific fields */}
                         {mode === "register" && role === "investor" && (
                             <div style={{
-                                padding: "1.25rem", background: "var(--bg-elevated)",
-                                borderRadius: "var(--radius-sm)", marginBottom: "1.25rem",
-                                border: "1px solid var(--light-border)"
+                                padding: "1.25rem", background: "var(--cream-dark)",
+                                borderRadius: "var(--radius-md)", marginBottom: "1.25rem",
+                                border: "1px solid var(--sand)"
                             }}>
-                                <p style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--terracotta)", marginBottom: "1rem" }}>
+                                <p style={{
+                                    fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase",
+                                    letterSpacing: "0.1em", color: "var(--forest)", marginBottom: "1rem"
+                                }}>
                                     Investor Profile
                                 </p>
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -207,31 +294,42 @@ export default function LoginPage({ onLogin, apiOnline }) {
                         {error && (
                             <div style={{
                                 padding: "0.65rem 1rem", marginBottom: "1rem",
-                                borderRadius: "var(--radius-sm)",
-                                background: "var(--danger-bg)", border: "1px solid var(--terracotta-light)",
-                                color: "var(--terracotta-dark)", fontSize: "0.85rem"
+                                borderRadius: "var(--radius-md)",
+                                background: "var(--danger-bg)", border: "1px solid var(--danger-border)",
+                                color: "var(--danger)", fontSize: "0.85rem",
+                                animation: "slideDown 0.3s ease"
                             }}>{error}</div>
                         )}
 
-                        <button type="submit" className="btn btn--primary"
+                        <button type="submit" className="btn btn--forest btn--lg"
                             disabled={loading}
-                            style={{ width: "100%", padding: "0.8rem", fontSize: "0.95rem" }}>
+                            style={{ width: "100%", fontSize: "0.95rem" }}>
                             {loading ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
                             {!loading && <ChevronRight size={18} />}
                         </button>
                     </form>
-                </div>
 
-                {/* API Status */}
-                <div style={{
-                    textAlign: "center", marginTop: "1.5rem",
-                    fontSize: "0.75rem", color: "var(--warm-gray)"
-                }}>
-                    API Status:
-                    <span style={{
-                        marginLeft: "0.4rem", fontWeight: 700,
-                        color: apiOnline ? "var(--olive)" : "var(--terracotta)"
-                    }}>{apiOnline ? "● Connected" : "● Offline"}</span>
+                    {/* API Status */}
+                    <div style={{
+                        textAlign: "center", marginTop: "2rem",
+                        fontSize: "0.72rem", color: "var(--slate)"
+                    }}>
+                        <span style={{
+                            display: "inline-flex", alignItems: "center", gap: "0.35rem",
+                            padding: "0.3rem 0.75rem",
+                            borderRadius: "var(--radius-full)",
+                            background: apiOnline ? "var(--success-bg)" : "var(--danger-bg)",
+                            border: `1px solid ${apiOnline ? "var(--success-border)" : "var(--danger-border)"}`,
+                            color: apiOnline ? "var(--success)" : "var(--danger)",
+                            fontWeight: 600
+                        }}>
+                            <span style={{
+                                width: 6, height: 6, borderRadius: "50%",
+                                background: apiOnline ? "var(--success)" : "var(--danger)"
+                            }} />
+                            {apiOnline ? "API Connected" : "API Offline"}
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

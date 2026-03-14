@@ -15,8 +15,8 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
                 <div style={{
                     display: "inline-flex", padding: "0.35rem 1rem",
                     borderRadius: "var(--radius-full)",
-                    background: "var(--bg-elevated)", border: "1px solid var(--light-border)",
-                    fontSize: "0.75rem", fontWeight: 600, color: "var(--olive-dark)",
+                    background: "var(--sage-light)", border: "1px solid var(--sage-muted)",
+                    fontSize: "0.72rem", fontWeight: 700, color: "var(--forest)",
                     textTransform: "uppercase", letterSpacing: "0.1em",
                     marginBottom: "1rem"
                 }}>
@@ -25,7 +25,7 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
                 <h2 style={{ fontSize: "2.2rem", marginBottom: "0.5rem" }}>
                     Portfolio Configuration
                 </h2>
-                <p style={{ color: "var(--warm-gray)", fontSize: "1.05rem" }}>
+                <p style={{ color: "var(--slate)", fontSize: "1.05rem" }}>
                     Define your investment parameters for contextual analysis
                 </p>
             </div>
@@ -56,7 +56,7 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
                     </div>
 
                     <div style={{ gridColumn: "span 2" }}>
-                        <label>Sectors <span style={{ textTransform: "none", fontWeight: 400, color: "var(--warm-gray)" }}>(comma-separated)</span></label>
+                        <label>Sectors <span style={{ textTransform: "none", fontWeight: 400, color: "var(--slate)" }}>(comma-separated)</span></label>
                         <input
                             type="text"
                             value={config.portfolio_sectors.join(", ")}
@@ -66,7 +66,7 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
                     </div>
 
                     <div>
-                        <label>Stages <span style={{ textTransform: "none", fontWeight: 400, color: "var(--warm-gray)" }}>(comma-separated)</span></label>
+                        <label>Stages <span style={{ textTransform: "none", fontWeight: 400, color: "var(--slate)" }}>(comma-separated)</span></label>
                         <input
                             type="text"
                             value={config.portfolio_stages.join(", ")}
@@ -76,7 +76,7 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
                     </div>
 
                     <div>
-                        <label>Geographies <span style={{ textTransform: "none", fontWeight: 400, color: "var(--warm-gray)" }}>(comma-separated)</span></label>
+                        <label>Geographies <span style={{ textTransform: "none", fontWeight: 400, color: "var(--slate)" }}>(comma-separated)</span></label>
                         <input
                             type="text"
                             value={config.portfolio_geographies.join(", ")}
@@ -107,9 +107,9 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
                         <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span>Max Sector Concentration</span>
                             <span style={{
-                                background: "var(--bg-elevated)", padding: "0.2rem 0.6rem",
+                                background: "var(--sage-light)", padding: "0.2rem 0.6rem",
                                 borderRadius: "var(--radius-full)", fontSize: "0.8rem",
-                                fontWeight: 700, color: "var(--terracotta)"
+                                fontWeight: 700, color: "var(--forest)"
                             }}>
                                 {config.target_max_sector_concentration_pct}%
                             </span>
@@ -119,7 +119,7 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
                             value={config.target_max_sector_concentration_pct}
                             onChange={(e) => setConfig({ ...config, target_max_sector_concentration_pct: parseFloat(e.target.value) })}
                         />
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--warm-gray)", marginTop: "0.15rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--slate)", marginTop: "0.15rem" }}>
                             <span>5%</span><span>50%</span><span>100%</span>
                         </div>
                     </div>
@@ -130,12 +130,12 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
             {error && (
                 <div style={{
                     padding: "0.85rem 1.25rem",
-                    borderRadius: "var(--radius-sm)",
+                    borderRadius: "var(--radius-md)",
                     background: "var(--danger-bg)",
-                    border: "1px solid var(--terracotta-light)",
-                    color: "var(--terracotta-dark)",
+                    border: "1px solid var(--danger-border)",
+                    color: "var(--danger)",
                     fontSize: "0.9rem", marginBottom: "1.5rem",
-                    animation: "fadeUp 0.3s ease"
+                    animation: "slideDown 0.3s ease"
                 }}>
                     <strong>Analysis Error:</strong> {error}
                 </div>
@@ -146,7 +146,7 @@ export default function Step2_Config({ config, setConfig, onBack, onRun, error }
                 <button className="btn" onClick={onBack}>
                     <ChevronLeft size={18} /> Back
                 </button>
-                <button className="btn btn--accent" onClick={onRun} style={{ padding: "0.85rem 2rem" }}>
+                <button className="btn btn--forest btn--lg" onClick={onRun}>
                     <Rocket size={18} /> Launch Analysis
                 </button>
             </div>

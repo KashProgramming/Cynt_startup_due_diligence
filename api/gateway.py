@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 from bson import ObjectId, Binary
+import bcrypt
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,7 @@ from utils.db import (
     get_users_collection,
     get_applications_collection,
     get_collaborations_collection,
+    get_collaboration_invites_collection,
 )
 from utils.linkedin_scraper import scrape_and_store_linkedin
 from utils.email_sender import send_decision_email
@@ -156,8 +158,10 @@ async def register(payload: str = Form(None)):
     if users.find_one({"email": email}):
         raise HTTPException(status_code=409, detail="Email already registered")
 
+    hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
     user_doc = {
-        "email": email, "password": password, "name": name,
+        "email": email, "password": hashed_pw, "name": name,
         "role": role, "created_at": _now(),
     }
     if role == "investor":
@@ -186,8 +190,23 @@ async def login(payload: str = Form(...)):
 
     users = get_users_collection()
     user = users.find_one({"email": email})
-    if not user or user["password"] != password:
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    stored_pw = user["password"]
+    # Support both bcrypt hashed and legacy plaintext passwords
+    if stored_pw.startswith("$2"):
+        # bcrypt hash
+        if not bcrypt.checkpw(password.encode("utf-8"), stored_pw.encode("utf-8")):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    else:
+        # Legacy plaintext — verify and upgrade to bcrypt
+        if stored_pw != password:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        # Upgrade: hash the plaintext password in-place
+        new_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        users.update_one({"_id": user["_id"]}, {"$set": {"password": new_hash}})
+
     return _serialize_user(user)
 
 
@@ -253,9 +272,30 @@ async def submit_application(
 
 @app.get("/applications/investor/{investor_id}")
 async def get_investor_applications(investor_id: str):
+    """Return all applications this investor owns PLUS any they've been invited to collaborate on."""
     apps = get_applications_collection()
-    docs = list(apps.find({"investor_id": investor_id}))
-    return [_serialize_app(d) for d in docs]
+    # Direct applications
+    direct = list(apps.find({"investor_id": investor_id}))
+    result = [_serialize_app(d) for d in direct]
+
+    # Collaboration-invite applications (new invite workflow)
+    invites_col = get_collaboration_invites_collection()
+    invites = list(invites_col.find({"collaborator_investor_id": investor_id}))
+    for invite in invites:
+        app_doc = apps.find_one({"_id": _oid(invite["application_id"])})
+        if not app_doc:
+            continue
+        serialized = _serialize_app(app_doc)
+        # Augment with collaboration context
+        serialized["is_collab_invite"] = True
+        serialized["collab_invite_id"] = str(invite["_id"])
+        serialized["collab_invite_status"] = invite.get("status", "INVITED")
+        serialized["collab_invited_by_name"] = invite.get("invited_by_investor_name", "")
+        # Attach this collaborator's own analysis result if they've assessed
+        serialized["collab_analysis_result"] = invite.get("analysis_result", None)
+        result.append(serialized)
+
+    return result
 
 
 @app.get("/applications/entrepreneur/{entrepreneur_id}")
@@ -289,25 +329,40 @@ async def analyze_application(app_id: str):
 
 @app.post("/applications/{app_id}/decision")
 async def set_application_decision(app_id: str, payload: str = Form(...)):
-    """Investor approves or rejects an analyzed application."""
+    """Investor accepts or rejects an analyzed application.
+
+    Statuses: PENDING/analyzed -> ACCEPTED or REJECTED (final).
+    Once a decision is made it cannot be changed.
+    """
     data = json.loads(payload)
-    decision = data.get("decision")  # "approved" | "rejected"
+    decision = data.get("decision")  # "accepted" | "rejected"
     message = data.get("message", "")
 
-    if decision not in ("approved", "rejected"):
-        raise HTTPException(status_code=422, detail="decision must be 'approved' or 'rejected'")
+    if decision not in ("accepted", "rejected"):
+        raise HTTPException(status_code=422, detail="decision must be 'accepted' or 'rejected'")
 
     apps = get_applications_collection()
     app_doc = apps.find_one({"_id": _oid(app_id)})
     if not app_doc:
         raise HTTPException(status_code=404, detail="Application not found")
 
+    # ── Guard: decision is final — no re-entry ────────────────────────────
+    current_status = app_doc.get("status", "")
+    if current_status in ("ACCEPTED", "REJECTED"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Decision already made: {current_status}. Cannot change.",
+        )
+
+    # Map to DB status
+    db_status = "ACCEPTED" if decision == "accepted" else "REJECTED"
+
     apps.update_one(
         {"_id": _oid(app_id)},
         {"$set": {
-            "status": decision,
+            "status": db_status,
             "decision_message": message,
-            "decision_at": _now(),
+            "decision_timestamp": _now(),
         }},
     )
 
@@ -315,15 +370,19 @@ async def set_application_decision(app_id: str, payload: str = Form(...)):
     try:
         entrepreneur_id = app_doc.get("entrepreneur_id")
         company_name = app_doc.get("company_name", "your startup")
+        investor_name = app_doc.get("investor_name", "")
         if entrepreneur_id:
             users = get_users_collection()
             entrepreneur = users.find_one({"_id": _oid(entrepreneur_id)})
             if entrepreneur and entrepreneur.get("email"):
+                # Map ACCEPTED/REJECTED -> approved/rejected for email templates
+                email_decision = "approved" if db_status == "ACCEPTED" else "rejected"
                 send_decision_email(
                     to_email=entrepreneur["email"],
                     company_name=company_name,
-                    decision=decision,
+                    decision=email_decision,
                     message=message,
+                    investor_name=investor_name,
                 )
     except Exception as e:
         print(f"⚠️  Email notification failed (non-blocking): {e}")
@@ -472,6 +531,368 @@ async def get_collaborations_for_investor(investor_id: str):
         ]
     }))
     return [_serialize_collab(d) for d in docs]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# COLLABORATION INVITES (new invite-based workflow)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _serialize_invite(doc: dict) -> dict:
+    doc = dict(doc)
+    doc["_id"] = str(doc["_id"])
+    for dt_field in ("created_at", "decision_timestamp"):
+        if dt_field in doc and isinstance(doc[dt_field], datetime):
+            doc[dt_field] = doc[dt_field].isoformat()
+    return doc
+
+
+@app.post("/collaborations/invite")
+async def invite_collaborator_new(payload: str = Form(...)):
+    """An accepted investor invites another investor to collaborate on a deal.
+
+    Edge-case guards enforced:
+    1. Inviting investor must have ACCEPTED status on this application.
+    2. Collaborator must not already have REJECTED status (as direct investor).
+    3. No duplicate invites for the same collaborator on the same application.
+    4. Collaborator cannot be the same as the inviting investor.
+    """
+    data = json.loads(payload)
+    application_id = data.get("application_id")
+    inviting_investor_id = data.get("inviting_investor_id")
+    collaborator_investor_id = data.get("collaborator_investor_id")
+
+    if not application_id or not inviting_investor_id or not collaborator_investor_id:
+        raise HTTPException(
+            status_code=422,
+            detail="application_id, inviting_investor_id, and collaborator_investor_id are required",
+        )
+
+    # ── Guard 4: Cannot invite yourself ───────────────────────────────────
+    if inviting_investor_id == collaborator_investor_id:
+        raise HTTPException(status_code=422, detail="Cannot invite yourself as a collaborator")
+
+    # ── Verify application exists ─────────────────────────────────────────
+    apps = get_applications_collection()
+    app_doc = apps.find_one({"_id": _oid(application_id)})
+    if not app_doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # ── Guard 1: Inviting investor must have ACCEPTED status ──────────────
+    if app_doc.get("investor_id") != inviting_investor_id:
+        # Check if this investor has any ACCEPTED application for the same startup
+        inv_app = apps.find_one({
+            "investor_id": inviting_investor_id,
+            "company_name": app_doc.get("company_name"),
+            "entrepreneur_id": app_doc.get("entrepreneur_id"),
+            "status": "ACCEPTED",
+        })
+        if not inv_app:
+            raise HTTPException(
+                status_code=403,
+                detail="Only investors who have ACCEPTED this startup can invite collaborators",
+            )
+    else:
+        if app_doc.get("status") != "ACCEPTED":
+            raise HTTPException(
+                status_code=403,
+                detail="Only investors who have ACCEPTED this startup can invite collaborators",
+            )
+
+    # ── Guard 2: Collaborator must not be a REJECTED investor ─────────────
+    rejected_app = apps.find_one({
+        "investor_id": collaborator_investor_id,
+        "company_name": app_doc.get("company_name"),
+        "entrepreneur_id": app_doc.get("entrepreneur_id"),
+        "status": "REJECTED",
+    })
+    if rejected_app:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot invite an investor who has already rejected this startup",
+        )
+
+    # ── Guard 3: No duplicate invites ─────────────────────────────────────
+    invites = get_collaboration_invites_collection()
+    existing = invites.find_one({
+        "application_id": application_id,
+        "collaborator_investor_id": collaborator_investor_id,
+    })
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="This investor has already been invited for this deal",
+        )
+
+    # Also check if collaborator was previously COLLAB_REJECTED for any app
+    # of the same startup
+    collab_rejected = invites.find_one({
+        "startup_company_name": app_doc.get("company_name"),
+        "entrepreneur_id": app_doc.get("entrepreneur_id"),
+        "collaborator_investor_id": collaborator_investor_id,
+        "status": "COLLAB_REJECTED",
+    })
+    if collab_rejected:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot invite an investor who has already rejected collaboration for this startup",
+        )
+
+    # ── Look up investor names ────────────────────────────────────────────
+    users = get_users_collection()
+    inviting_investor = users.find_one({"_id": _oid(inviting_investor_id)})
+    collaborator_investor = users.find_one({"_id": _oid(collaborator_investor_id)})
+
+    if not collaborator_investor or collaborator_investor.get("role") != "investor":
+        raise HTTPException(status_code=404, detail="Collaborator investor not found")
+
+    invite_doc = {
+        "application_id": application_id,
+        "startup_company_name": app_doc.get("company_name", ""),
+        "entrepreneur_id": app_doc.get("entrepreneur_id", ""),
+        "invited_by_investor_id": inviting_investor_id,
+        "invited_by_investor_name": inviting_investor.get("name", "") if inviting_investor else "",
+        "collaborator_investor_id": collaborator_investor_id,
+        "collaborator_investor_name": collaborator_investor.get("name", ""),
+        "status": "INVITED",
+        "created_at": _now(),
+        "decision_timestamp": None,
+    }
+
+    result = invites.insert_one(invite_doc)
+    invite_doc["_id"] = result.inserted_id
+    return _serialize_invite(invite_doc)
+
+
+@app.post("/collaborations/invites/{invite_id}/assess")
+async def assess_as_collab_invitee(invite_id: str):
+    """An invited collaborator runs the AI analysis with their own investor profile.
+
+    Updates the analysis_result on the invite document and sets status to COLLAB_ASSESSED.
+    This must be done before the collaborator can accept or reject.
+    """
+    invites = get_collaboration_invites_collection()
+    invite = invites.find_one({"_id": _oid(invite_id)})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Collaboration invite not found")
+
+    if invite.get("status") not in ("INVITED", "COLLAB_ASSESSED"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot assess: invite status is {invite.get('status')}",
+        )
+
+    # Get the application
+    apps = get_applications_collection()
+    app_doc = apps.find_one({"_id": _oid(invite["application_id"])})
+    if not app_doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # Use the collaborator's own investor profile for analysis
+    users = get_users_collection()
+    investor = users.find_one({"_id": _oid(invite["collaborator_investor_id"])})
+    if not investor:
+        raise HTTPException(status_code=404, detail="Collaborator investor not found")
+
+    result_dict = await _run_analysis_on_app(app_doc, investor)
+
+    invites.update_one(
+        {"_id": _oid(invite_id)},
+        {"$set": {
+            "status": "COLLAB_ASSESSED",
+            "analysis_result": result_dict,
+        }},
+    )
+    return result_dict
+
+
+@app.post("/collaborations/invites/{invite_id}/decide")
+async def decide_collaboration_invite(invite_id: str, payload: str = Form(...)):
+    """Collaborator investor accepts or rejects a collaboration invitation.
+
+    Must have assessed first (status = COLLAB_ASSESSED).
+    Once decided, the decision is final.
+    """
+    data = json.loads(payload)
+    decision = data.get("decision")  # "accept" | "reject"
+
+    if decision not in ("accept", "reject"):
+        raise HTTPException(status_code=422, detail="decision must be 'accept' or 'reject'")
+
+    invites = get_collaboration_invites_collection()
+    invite = invites.find_one({"_id": _oid(invite_id)})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Collaboration invite not found")
+
+    current = invite.get("status", "")
+    # ── Guard: must have assessed before deciding ─────────────────────────
+    if current == "INVITED":
+        raise HTTPException(
+            status_code=409,
+            detail="You must assess the application before making a decision.",
+        )
+    # ── Guard: cannot re-decide ───────────────────────────────────────────
+    if current in ("COLLAB_ACCEPTED", "COLLAB_REJECTED"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Decision already made: {current}. Cannot change.",
+        )
+
+    new_status = "COLLAB_ACCEPTED" if decision == "accept" else "COLLAB_REJECTED"
+
+    invites.update_one(
+        {"_id": _oid(invite_id)},
+        {"$set": {
+            "status": new_status,
+            "decision_timestamp": _now(),
+        }},
+    )
+
+    # ── On ACCEPT: persist into collaborations collection ─────────────────
+    if new_status == "COLLAB_ACCEPTED":
+        collabs = get_collaborations_collection()
+        # Only insert once (guard against re-runs)
+        existing_collab = collabs.find_one({
+            "invite_id": invite_id,
+        })
+        if not existing_collab:
+            collab_doc = {
+                "invite_id": invite_id,
+                "application_id": invite.get("application_id"),
+                "startup_company_name": invite.get("startup_company_name", ""),
+                "entrepreneur_id": invite.get("entrepreneur_id", ""),
+                "invited_by_investor_id": invite.get("invited_by_investor_id"),
+                "invited_by_investor_name": invite.get("invited_by_investor_name", ""),
+                "collaborator_investor_id": invite.get("collaborator_investor_id"),
+                "collaborator_investor_name": invite.get("collaborator_investor_name", ""),
+                "status": "COLLAB_ACCEPTED",
+                "created_at": _now(),
+            }
+            collabs.insert_one(collab_doc)
+
+    updated = invites.find_one({"_id": _oid(invite_id)})
+    return _serialize_invite(updated)
+
+
+@app.get("/collaborations/hub/{investor_id}")
+async def get_collaboration_hub(investor_id: str):
+    """Return all decided collaboration invites (sent OR received) for the hub.
+
+    Includes both COLLAB_ACCEPTED and COLLAB_REJECTED so both parties can see
+    the full history of collaboration decisions.
+    """
+    invites = get_collaboration_invites_collection()
+    docs = list(invites.find({
+        "$or": [
+            {"invited_by_investor_id": investor_id},
+            {"collaborator_investor_id": investor_id},
+        ],
+        "status": {"$in": ["COLLAB_ACCEPTED", "COLLAB_REJECTED"]},
+    }))
+    return [_serialize_invite(d) for d in docs]
+
+
+@app.get("/collaborations/invites/investor/{investor_id}")
+async def get_invites_for_investor(investor_id: str):
+    """Get all collaboration invites where this investor is the collaborator."""
+    invites = get_collaboration_invites_collection()
+    docs = list(invites.find({"collaborator_investor_id": investor_id}))
+    return [_serialize_invite(d) for d in docs]
+
+
+@app.get("/collaborations/invites/sent/{investor_id}")
+async def get_invites_sent_by_investor(investor_id: str):
+    """Get all collaboration invites sent by this investor."""
+    invites = get_collaboration_invites_collection()
+    docs = list(invites.find({"invited_by_investor_id": investor_id}))
+    return [_serialize_invite(d) for d in docs]
+
+
+@app.get("/applications/{app_id}/deal-summary")
+async def get_deal_summary(app_id: str):
+    """Get the full deal summary for an application.
+
+    Returns:
+    - All investors for this startup with their statuses
+    - All collaboration invites with statuses and who invited whom
+    - List of active (participating) investors
+    """
+    apps = get_applications_collection()
+    app_doc = apps.find_one({"_id": _oid(app_id)})
+    if not app_doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    company_name = app_doc.get("company_name")
+    entrepreneur_id = app_doc.get("entrepreneur_id")
+
+    # ── All investor applications for this startup ────────────────────────
+    all_apps = list(apps.find({
+        "company_name": company_name,
+        "entrepreneur_id": entrepreneur_id,
+    }))
+
+    investors = []
+    active_investors = []
+    for a in all_apps:
+        status = a.get("status", "pending").upper()
+        # Normalize: "pending" and "analyzed" both map to PENDING for the summary
+        if status in ("PENDING", "ANALYZED"):
+            display_status = "PENDING"
+        elif status == "ACCEPTED":
+            display_status = "ACCEPTED"
+        elif status == "REJECTED":
+            display_status = "REJECTED"
+        else:
+            display_status = status.upper()
+
+        investor_info = {
+            "application_id": str(a["_id"]),
+            "investor_id": a.get("investor_id"),
+            "investor_name": a.get("investor_name"),
+            "status": display_status,
+        }
+        investors.append(investor_info)
+
+        if display_status == "ACCEPTED":
+            active_investors.append({
+                "investor_id": a.get("investor_id"),
+                "investor_name": a.get("investor_name"),
+                "role": "direct_investor",
+            })
+
+    # ── All collaboration invites for this startup ────────────────────────
+    invites_col = get_collaboration_invites_collection()
+    all_invites = list(invites_col.find({
+        "startup_company_name": company_name,
+        "entrepreneur_id": entrepreneur_id,
+    }))
+
+    collaborators = []
+    for inv in all_invites:
+        collab_info = {
+            "invite_id": str(inv["_id"]),
+            "collaborator_investor_id": inv.get("collaborator_investor_id"),
+            "collaborator_investor_name": inv.get("collaborator_investor_name"),
+            "invited_by_investor_id": inv.get("invited_by_investor_id"),
+            "invited_by_investor_name": inv.get("invited_by_investor_name"),
+            "status": inv.get("status"),
+        }
+        collaborators.append(collab_info)
+
+        if inv.get("status") == "COLLAB_ACCEPTED":
+            active_investors.append({
+                "investor_id": inv.get("collaborator_investor_id"),
+                "investor_name": inv.get("collaborator_investor_name"),
+                "role": "collaborator",
+                "invited_by": inv.get("invited_by_investor_name"),
+            })
+
+    return {
+        "company_name": company_name,
+        "entrepreneur_id": entrepreneur_id,
+        "investors": investors,
+        "collaborators": collaborators,
+        "active_investors": active_investors,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
