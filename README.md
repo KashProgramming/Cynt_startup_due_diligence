@@ -20,6 +20,7 @@ Cynt is a **B2B investment intelligence platform** that connects entrepreneurs a
 ---
 
 ## Key Features
+
 - Multi-agent AI pipeline for automated startup due diligence
 - Document ingestion from pitch decks, financial spreadsheets, and founder profiles
 - Deterministic financial simulations and market signal analysis
@@ -134,16 +135,12 @@ cynt_due_diligence/
 ---
 
 ## Core Modules
-**Document Processor**  
-Extracts structured startup data from pitch decks, financial spreadsheets, and founder profiles.
-**Financial Simulation Engine**  
-Computes financial health metrics such as runway, burn efficiency, dilution, and capital efficiency.
-**Market Signal Connector**  
-Fetches external market signals from Google Trends and news activity to estimate market momentum.
-**Memo Generator**  
-Produces a structured investment memo summarizing analysis results and risks.
-**Pipeline Orchestrator**  
-Coordinates the full asynchronous analysis pipeline and aggregates agent outputs.
+
+- **Document Processor**: Extracts structured startup data from pitch decks, financial spreadsheets, and founder profiles.
+- **Financial Simulation Engine**: Computes financial health metrics such as runway, burn efficiency, dilution, and capital efficiency.
+- **Market Signal Connector**: Fetches external market signals from Google Trends and news activity to estimate market momentum.
+- **Memo Generator**: Produces a structured investment memo summarizing analysis results and risks.
+- **Pipeline Orchestrator**: Coordinates the full asynchronous analysis pipeline and aggregates agent outputs.
 
 ---
 
@@ -175,22 +172,21 @@ API base URL auto-detects environment: Vite dev server (port 5170–5180) → `l
 ---
 
 ### Entrepreneur Flow
-**Dashboard**
+#### Dashboard
 Entrepreneurs can view and manage all of their submitted applications. The dashboard displays:
 - Company name
 - Target investor
 - Application status
 - Submission date
 
-**Apply to Investor**
-The **"Apply to Investor"** button opens a submission wizard:
+#### Apply to Investor
 **Upload required files and startup details:**
-  - Pitch deck (PDF)
-  - Financials (CSV/XLSX)
-  - Founder profile (PDF)
-  - Company name
-  - Founder LinkedIn URL
-  - Target investor(s)
+- Pitch deck (PDF)
+- Financials (CSV/XLSX)
+- Founder profile (PDF)
+- Company name
+- Founder LinkedIn URL
+- Target investor(s)
 
 **Application Status**
 Applications appear in the dashboard with one of the following statuses:
