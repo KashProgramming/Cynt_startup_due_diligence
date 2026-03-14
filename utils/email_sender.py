@@ -30,9 +30,7 @@ def _build_approved_html(company_name: str, message: str, investor_name: str = "
             <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
             <h2 style="color: #2d7d46; margin-bottom: 0.75rem;">Application Accepted!</h2>
             <p style="color: #333; font-size: 1.05rem; line-height: 1.7;">
-                We're delighted to inform you that <strong>{company_name}</strong> has been <strong style="color: #2d7d46;">accepted</strong> by <strong>{investor_display}</strong> on the Cynt platform.
-                This decision reflects genuine interest in your startup's vision and potential.
-                Please review the message below and expect to be contacted shortly regarding next steps.
+                We're delighted to inform you that <strong>{company_name}</strong> has been <strong style="color: #2d7d46;">accepted</strong> by <strong>{investor_display}</strong> on the Cynt platform.                
             </p>
             {f'<div style="margin-top: 1.5rem; padding: 1rem; background: #fff; border-radius: 8px; border: 1px solid #e0e0e0;"><p style="color: #555; font-size: 0.95rem; line-height: 1.6; margin: 0;">{message}</p></div>' if message else ''}
         </div>
@@ -56,8 +54,6 @@ def _build_declined_html(company_name: str, message: str, investor_name: str = "
             <h2 style="color: #c1553b; margin-bottom: 0.75rem;">Application Update</h2>
             <p style="color: #333; font-size: 1.05rem; line-height: 1.7;">
                 After careful consideration, <strong>{investor_display}</strong> has decided not to move forward with <strong>{company_name}</strong> at this time.
-                We appreciate the effort you put into your application and encourage you to keep building — great startups take time.
-                Please review the message below for specific feedback from the investor.
             </p>
             {f'<div style="margin-top: 1.5rem; padding: 1rem; background: #fff; border-radius: 8px; border: 1px solid #e0e0e0;"><p style="color: #555; font-size: 0.95rem; line-height: 1.6; margin: 0;">{message}</p></div>' if message else ''}
         </div>
