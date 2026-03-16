@@ -2,6 +2,23 @@
 
 > **Cynt** is a full-stack platform that automates startup investment due diligence using a multi-agent AI pipeline. Entrepreneurs submit their documents; investors receive structured analysis, scores, and a go/no-go recommendation — all in minutes.
 
+---
+
+## Overview
+
+Cynt is a **B2B investment intelligence platform** that connects entrepreneurs and investors. The core value proposition is a **4-stage async AI pipeline** that:
+
+1. Extracts structured data from raw documents (PDFs, CSVs/XLSX).
+2. Runs deterministic financial and market simulations.
+3. Scores the startup across three dimensions using LLM-powered agents.
+4. Synthesises a final investment recommendation and a plain-text investment memo.
+
+**Two user roles** exist:
+- **Entrepreneurs** — upload pitch deck, financials, and founder profile, select and apply to investors, receive emails for decisions.
+- **Investors** — review applications, trigger AI analysis, accept/reject startups, and invite other investors to collaborate.
+
+---
+
 ## Key Features
 
 - Multi-agent AI pipeline for automated startup due diligence
