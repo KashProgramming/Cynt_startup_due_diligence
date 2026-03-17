@@ -28,6 +28,9 @@ Cynt is a **B2B investment intelligence platform** that connects entrepreneurs a
 - Collaboration workflow enabling multiple investors to evaluate the same startup
 - Automated email notifications informing entrepreneurs when applications are **approved or rejected**, including the **investor decision and message**
 
+## Demo Video
+[Watch Demo](https://drive.google.com/file/d/15-hrVq_iJT1eSrGmME1iTjClTEu_f3G9/view?usp=share_link)
+
 ## Technology Stack
 | Layer | Technology |
 |------|------------|
