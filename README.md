@@ -148,7 +148,7 @@ cynt_due_diligence/
 ---
 
 ## AI Agents
-All agents use `langchain_groq.ChatGroq` with `temperature=0` (deterministic), `llama-3.3-70b-versatile`. They receive a structured system prompt + a tightly-formatted human message and return a **JSON object only**.
+All agents use `langchain_groq.ChatGroq` with `temperature=0` (deterministic), `openai/gpt-oss-120b`. They receive a structured system prompt + a tightly-formatted human message and return a **JSON object only**.
 There are three specialized AI agents:
 - Financial Risk Agent – evaluates burn rate, runway, and valuation realism.
 - Market Validation Agent – analyzes market demand signals and competitive saturation.
